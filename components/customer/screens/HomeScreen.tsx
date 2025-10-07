@@ -1,0 +1,1070 @@
+import React, { useEffect, useState, useRef } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  SafeAreaView,
+  ScrollView,
+  TouchableOpacity,
+  TextInput,
+  Image,
+  Dimensions,
+  Alert,
+  StatusBar,
+  FlatList,
+} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useAuth } from '../../../contexts/AuthContext';
+
+const { width } = Dimensions.get('window');
+const IMAGE_WIDTH = width * 0.75;
+const IMAGE_SPACING = 16;
+const VIDEO_WIDTH = (width - 60) / 2.5;
+const VIDEO_SPACING = 12;
+
+type ServiceCategory = {
+  id: string;
+  name: string;
+  image: string;
+  icon: string;
+};
+
+type Service = {
+  id: string;
+  name: string;
+  category: string;
+  description: string;
+  price: number;
+  duration: number;
+  rating: number;
+  reviews: number;
+  image: string;
+  discount?: number;
+  popular?: boolean;
+};
+
+type BannerImage = {
+  id: string;
+  image: string;
+  title: string;
+};
+
+type VideoItem = {
+  id: string;
+  thumbnail: string;
+  title: string;
+  duration: string;
+};
+
+export default function HomeScreen() {
+  const { user } = useAuth();
+  const [searchQuery, setSearchQuery] = useState('');
+  const [categories, setCategories] = useState<ServiceCategory[]>([]);
+  const [services, setServices] = useState<Service[]>([]);
+  const [filteredServices, setFilteredServices] = useState<Service[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [bannerImages, setBannerImages] = useState<BannerImage[]>([]);
+  const [videos, setVideos] = useState<VideoItem[]>([]);
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  useEffect(() => {
+    filterServices();
+  }, [searchQuery, selectedCategory, services]);
+
+  const loadData = async () => {
+    try {
+      // Banner Images
+      const bannerList: BannerImage[] = [
+        {
+          id: '1',
+          image:"",
+          title: 'Summer Sale',
+        },
+        {
+          id: '2',
+          image: 'https://source.unsplash.com/900x500/?cleaning,promotion',
+          title: 'Deep Cleaning Offer',
+        },
+        {
+          id: '3',
+          image: 'https://source.unsplash.com/900x500/?salon,beauty',
+          title: 'Beauty Services',
+        },
+        {
+          id: '4',
+          image: 'https://source.unsplash.com/900x500/?repair,service',
+          title: 'AC Service Deal',
+        },
+      ];
+
+      // Videos
+      const videoList: VideoItem[] = [
+        {
+          id: '1',
+          thumbnail: 'https://source.unsplash.com/400x600/?cleaning,professional',
+          title: 'How We Clean Your Home',
+          duration: '2:30',
+        },
+        {
+          id: '2',
+          thumbnail: 'https://source.unsplash.com/400x600/?salon,beauty',
+          title: 'Salon Services at Home',
+          duration: '1:45',
+        },
+        {
+          id: '3',
+          thumbnail: 'https://source.unsplash.com/400x600/?ac-repair',
+          title: 'AC Repair Guide',
+          duration: '3:10',
+        },
+        {
+          id: '4',
+          thumbnail: 'https://source.unsplash.com/400x600/?electrician',
+          title: 'Safety Tips & Guidelines',
+          duration: '2:15',
+        },
+        {
+          id: '5',
+          thumbnail: 'https://source.unsplash.com/400x600/?plumber',
+          title: 'Plumbing Solutions',
+          duration: '1:55',
+        },
+      ];
+
+      const categoryList: ServiceCategory[] = [
+        {
+          id: '1',
+          name: 'AC Repair',
+          image: 'https://source.unsplash.com/400x400/?air-conditioner',
+          icon: 'snow',
+        },
+        {
+          id: '2',
+          name: 'Salon for Women',
+          image: 'https://source.unsplash.com/400x400/?salon,women',
+          icon: 'cut',
+        },
+        {
+          id: '3',
+          name: 'Home Cleaning',
+          image: 'https://source.unsplash.com/400x400/?cleaning',
+          icon: 'sparkles',
+        },
+        {
+          id: '4',
+          name: 'Electrician',
+          image: 'https://source.unsplash.com/400x400/?electrician',
+          icon: 'flash',
+        },
+        {
+          id: '5',
+          name: 'Plumber',
+          image: 'https://source.unsplash.com/400x400/?plumber',
+          icon: 'water',
+        },
+        {
+          id: '6',
+          name: 'Painter',
+          image: 'https://source.unsplash.com/400x400/?painter',
+          icon: 'color-palette',
+        },
+      ];
+
+      const serviceList: Service[] = [
+        // AC REPAIR SERVICES
+        {
+          id: '1',
+          name: 'AC Service & Gas Refill',
+          category: 'AC Repair',
+          description: 'Complete AC checkup with gas refill and cooling restoration',
+          price: 899,
+          duration: 150,
+          rating: 4.76,
+          reviews: 470000,
+          image: 'https://source.unsplash.com/800x600/?air-conditioner,repair',
+          discount: 25,
+          popular: true,
+        },
+        {
+          id: '2',
+          name: 'AC Deep Cleaning',
+          category: 'AC Repair',
+          description: 'Deep cleaning with foam jet technology for split/window AC',
+          price: 599,
+          duration: 90,
+          rating: 4.78,
+          reviews: 285000,
+          image: 'https://source.unsplash.com/800x600/?air-conditioning,technician',
+        },
+        {
+          id: '3',
+          name: 'AC Installation & Uninstallation',
+          category: 'AC Repair',
+          description: 'Professional split AC installation with pipe & drainage setup',
+          price: 1699,
+          duration: 120,
+          rating: 4.70,
+          reviews: 109000,
+          image: 'https://source.unsplash.com/800x600/?ac-installation,technician',
+        },
+
+        // SALON FOR WOMEN SERVICES
+        {
+          id: '4',
+          name: 'Hair Cut & Styling',
+          category: 'Salon for Women',
+          description: 'Professional haircut with styling by expert beauticians',
+          price: 399,
+          duration: 45,
+          rating: 4.85,
+          reviews: 524000,
+          image: 'https://source.unsplash.com/800x600/?hairstyle,salon',
+          popular: true,
+        },
+        {
+          id: '5',
+          name: 'Facial & Glow Treatment',
+          category: 'Salon for Women',
+          description: 'VLCC/O3+ facial with deep cleansing and skin brightening',
+          price: 899,
+          duration: 60,
+          rating: 4.89,
+          reviews: 687000,
+          image: 'https://source.unsplash.com/800x600/?facial,beauty',
+          discount: 30,
+        },
+        {
+          id: '6',
+          name: 'Waxing - Full Arms & Legs',
+          category: 'Salon for Women',
+          description: 'Pain-free waxing with Rica/Honey wax at your doorstep',
+          price: 699,
+          duration: 50,
+          rating: 4.83,
+          reviews: 945000,
+          image: 'https://source.unsplash.com/800x600/?beauty-salon,waxing',
+        },
+        {
+          id: '7',
+          name: 'Hair Spa & Treatment',
+          category: 'Salon for Women',
+          description: 'Nourishing hair spa with L\'Oreal or Matrix products',
+          price: 1099,
+          duration: 75,
+          rating: 4.87,
+          reviews: 412000,
+          image: 'https://source.unsplash.com/800x600/?hair-spa,salon',
+          popular: true,
+        },
+        {
+          id: '8',
+          name: 'Manicure & Pedicure',
+          category: 'Salon for Women',
+          description: 'Premium nail care with OPI polishes and French manicure',
+          price: 799,
+          duration: 60,
+          rating: 4.81,
+          reviews: 623000,
+          image: 'https://source.unsplash.com/800x600/?manicure,pedicure',
+          discount: 20,
+        },
+        {
+          id: '9',
+          name: 'Bridal Makeup',
+          category: 'Salon for Women',
+          description: 'Complete bridal makeup package with HD airbrush & hairstyling',
+          price: 8999,
+          duration: 180,
+          rating: 4.92,
+          reviews: 89000,
+          image: 'https://source.unsplash.com/800x600/?bridal-makeup',
+        },
+
+        // HOME CLEANING SERVICES
+        {
+          id: '10',
+          name: 'Bathroom Deep Cleaning',
+          category: 'Home Cleaning',
+          description: 'Intensive cleaning of tiles, fixtures, and drainage with chemicals',
+          price: 905,
+          duration: 120,
+          rating: 4.82,
+          reviews: 1500000,
+          image: 'https://source.unsplash.com/800x600/?bathroom-cleaning',
+          popular: true,
+        },
+        {
+          id: '11',
+          name: 'Kitchen Deep Cleaning',
+          category: 'Home Cleaning',
+          description: 'Thorough kitchen cleaning including chimney, counters & cabinets',
+          price: 1099,
+          duration: 150,
+          rating: 4.79,
+          reviews: 1230000,
+          image: 'https://source.unsplash.com/800x600/?kitchen-cleaning',
+          discount: 15,
+        },
+        {
+          id: '12',
+          name: 'Full Home Deep Cleaning',
+          category: 'Home Cleaning',
+          description: 'Complete home sanitization with eco-friendly cleaning agents',
+          price: 2499,
+          duration: 240,
+          rating: 4.84,
+          reviews: 892000,
+          image: 'https://source.unsplash.com/800x600/?home-cleaning,professional',
+        },
+        {
+          id: '13',
+          name: 'Sofa & Carpet Cleaning',
+          category: 'Home Cleaning',
+          description: 'Steam cleaning for sofas, carpets, and upholstery',
+          price: 1299,
+          duration: 90,
+          rating: 4.77,
+          reviews: 567000,
+          image: 'https://source.unsplash.com/800x600/?sofa-cleaning',
+          discount: 10,
+        },
+        {
+          id: '14',
+          name: 'Move-in/Move-out Cleaning',
+          category: 'Home Cleaning',
+          description: 'Complete house cleaning for moving in or out',
+          price: 3499,
+          duration: 300,
+          rating: 4.80,
+          reviews: 234000,
+          image: 'https://source.unsplash.com/800x600/?house-cleaning',
+        },
+
+        // OTHER SERVICES
+        {
+          id: '15',
+          name: 'Switch Board Repair',
+          category: 'Electrician',
+          description: 'Fix switch boards and electrical issues safely',
+          price: 499,
+          duration: 45,
+          rating: 4.71,
+          reviews: 345000,
+          image: 'https://source.unsplash.com/800x600/?electrician,tools',
+        },
+        {
+          id: '16',
+          name: 'Tap Leakage Fix',
+          category: 'Plumber',
+          description: 'Fix tap and pipe leakages with expert plumbers',
+          price: 399,
+          duration: 40,
+          rating: 4.68,
+          reviews: 456000,
+          image: 'https://source.unsplash.com/800x600/?plumber,tools',
+        },
+        {
+          id: '17',
+          name: 'Premium Wall Painting',
+          category: 'Painter',
+          description: 'Expert painting with premium Asian Paints colors',
+          price: 1999,
+          duration: 180,
+          rating: 4.75,
+          reviews: 178000,
+          image: 'https://source.unsplash.com/800x600/?painter,painting',
+          discount: 15,
+        },
+      ];
+
+      setBannerImages(bannerList);
+      setVideos(videoList);
+      setCategories(categoryList);
+      setServices(serviceList);
+      setFilteredServices(serviceList);
+    } catch (error) {
+      Alert.alert('Error', 'Failed to load services');
+    }
+  };
+
+  const filterServices = () => {
+    let filtered = services;
+
+    if (selectedCategory) {
+      filtered = filtered.filter(service => service.category === selectedCategory);
+    }
+
+    if (searchQuery) {
+      filtered = filtered.filter(service =>
+        service.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        service.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        service.description.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+    }
+
+    setFilteredServices(filtered);
+  };
+
+  const formatReviews = (reviews: number) => {
+    if (reviews >= 1000000) {
+      return `${(reviews / 1000000).toFixed(1)}M`;
+    } else if (reviews >= 1000) {
+      return `${(reviews / 1000).toFixed(0)}K`;
+    }
+    return reviews.toString();
+  };
+
+  const renderBannerItem = ({ item }: { item: BannerImage }) => (
+    <TouchableOpacity
+      style={styles.bannerItem}
+      activeOpacity={0.9}
+      onPress={() => Alert.alert('Banner', item.title)}
+    >
+      <Image source={{ uri: item.image }} style={styles.bannerImage} />
+      <View style={styles.bannerOverlay}>
+        <Text style={styles.bannerTitle}>{item.title}</Text>
+      </View>
+    </TouchableOpacity>
+  );
+
+  const renderVideoItem = ({ item }: { item: VideoItem }) => (
+    <TouchableOpacity
+      style={styles.videoItem}
+      activeOpacity={0.9}
+      onPress={() => Alert.alert('Video', item.title)}
+    >
+      <View style={styles.videoContainer}>
+        <Image source={{ uri: item.thumbnail }} style={styles.videoThumbnail} />
+        <View style={styles.playButtonContainer}>
+          <Ionicons name="play-circle" size={48} color="#fff" />
+        </View>
+        <View style={styles.videoDurationBadge}>
+          <Text style={styles.videoDurationText}>{item.duration}</Text>
+        </View>
+      </View>
+      <Text style={styles.videoTitle} numberOfLines={2}>
+        {item.title}
+      </Text>
+    </TouchableOpacity>
+  );
+
+  const renderServiceCard = (item: Service) => (
+    <TouchableOpacity
+      key={item.id}
+      style={styles.serviceCard}
+      activeOpacity={0.95}
+      onPress={() => Alert.alert('Service Selected', `Selected: ${item.name}`)}
+    >
+      <View style={styles.imageContainer}>
+        <Image source={{ uri: item.image }} style={styles.serviceImage} />
+        {item.discount && (
+          <View style={styles.discountBadge}>
+            <Text style={styles.discountText}>{item.discount}% OFF</Text>
+          </View>
+        )}
+        {item.popular && (
+          <View style={styles.popularBadge}>
+            <Ionicons name="flame" size={12} color="#fff" />
+            <Text style={styles.popularText}>Popular</Text>
+          </View>
+        )}
+      </View>
+
+      <View style={styles.serviceInfo}>
+        <View style={styles.serviceHeader}>
+          <View style={styles.serviceTitleContainer}>
+            <Text style={styles.serviceName} numberOfLines={1}>
+              {item.name}
+            </Text>
+            <View style={styles.ratingBadge}>
+              <Ionicons name="star" size={12} color="#FFB800" />
+              <Text style={styles.ratingText}>{item.rating}</Text>
+              <Text style={styles.reviewsText}>({formatReviews(item.reviews)})</Text>
+            </View>
+          </View>
+        </View>
+
+        <Text style={styles.serviceDescription} numberOfLines={2}>
+          {item.description}
+        </Text>
+
+        <View style={styles.serviceFooter}>
+          <View style={styles.priceSection}>
+            <Text style={styles.servicePrice}>₹{item.price}</Text>
+            {item.discount && (
+              <Text style={styles.originalPrice}>
+                ₹{Math.round(item.price / (1 - item.discount / 100))}
+              </Text>
+            )}
+          </View>
+          <View style={styles.durationBadge}>
+            <Ionicons name="time-outline" size={14} color="#666" />
+            <Text style={styles.durationText}>{item.duration} min</Text>
+          </View>
+        </View>
+
+        <TouchableOpacity style={styles.bookButton}>
+          <Text style={styles.bookButtonText}>Book Now</Text>
+        </TouchableOpacity>
+      </View>
+    </TouchableOpacity>
+  );
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="dark-content" backgroundColor="#fff" />
+      
+      {/* Header */}
+      <View style={styles.header}>
+        <View style={styles.headerLeft}>
+          <View style={styles.locationContainer}>
+            <Ionicons name="location" size={20} color="#6C3FE4" />
+            <Text style={styles.locationText}>Home</Text>
+            <Ionicons name="chevron-down" size={16} color="#333" />
+          </View>
+          <Text style={styles.greeting}>Hey {user?.name || 'User'}!</Text>
+        </View>
+        <View style={styles.headerRight}>
+          <TouchableOpacity style={styles.iconButton}>
+            <Ionicons name="heart-outline" size={24} color="#333" />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.iconButton}>
+            <Ionicons name="notifications-outline" size={24} color="#333" />
+            <View style={styles.notificationDot} />
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* Search Bar */}
+      <View style={styles.searchSection}>
+        <View style={styles.searchContainer}>
+          <Ionicons name="search" size={20} color="#999" />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search for services"
+            placeholderTextColor="#999"
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={() => setSearchQuery('')}>
+              <Ionicons name="close-circle" size={20} color="#999" />
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
+
+      <ScrollView 
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+      >
+        {/* 1. Categories - Grid Layout */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Categories</Text>
+            <TouchableOpacity>
+              <Text style={styles.seeAllText}>See all</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.categoriesGrid}>
+            {categories.map(category => (
+              <TouchableOpacity
+                key={category.id}
+                style={[
+                  styles.categoryCard,
+                  selectedCategory === category.name && styles.categoryCardActive,
+                ]}
+                activeOpacity={0.8}
+                onPress={() =>
+                  setSelectedCategory(selectedCategory === category.name ? null : category.name)
+                }
+              >
+                <View
+                  style={[
+                    styles.categoryIconContainer,
+                    selectedCategory === category.name && styles.categoryIconActive,
+                  ]}
+                >
+                  <Image source={{ uri: category.image }} style={styles.categoryImage} />
+                </View>
+                <Text
+                  style={[
+                    styles.categoryName,
+                    selectedCategory === category.name && styles.categoryNameActive,
+                  ]}
+                  numberOfLines={2}
+                >
+                  {category.name}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+
+        {/* 2. Image Slider - Shows 1 image + 25% of next */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Special Offers</Text>
+            <TouchableOpacity>
+              <Text style={styles.seeAllText}>See all</Text>
+            </TouchableOpacity>
+          </View>
+          <FlatList
+            data={bannerImages}
+            renderItem={renderBannerItem}
+            keyExtractor={item => item.id}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            snapToInterval={IMAGE_WIDTH + IMAGE_SPACING}
+            decelerationRate="fast"
+            contentContainerStyle={styles.bannerListContainer}
+            snapToAlignment="start"
+          />
+        </View>
+
+        {/* 3. Video Slider - Shows 2.5 videos */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>How We Work</Text>
+            <TouchableOpacity>
+              <Text style={styles.seeAllText}>See all</Text>
+            </TouchableOpacity>
+          </View>
+          <FlatList
+            data={videos}
+            renderItem={renderVideoItem}
+            keyExtractor={item => item.id}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            snapToInterval={VIDEO_WIDTH + VIDEO_SPACING}
+            decelerationRate="fast"
+            contentContainerStyle={styles.videoListContainer}
+            snapToAlignment="start"
+          />
+        </View>
+
+        {/* 4. Popular Services */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>
+              {selectedCategory ? `${selectedCategory} Services` : 'Popular Services'}
+            </Text>
+            {filteredServices.length > 0 && (
+              <TouchableOpacity>
+                <Text style={styles.seeAllText}>See all</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          <View style={styles.servicesContainer}>
+            {filteredServices.length > 0 ? (
+              filteredServices.map(renderServiceCard)
+            ) : (
+              <View style={styles.emptyState}>
+                <Ionicons name="search" size={64} color="#E0E0E0" />
+                <Text style={styles.emptyStateText}>No services found</Text>
+                <Text style={styles.emptyStateSubtext}>Try searching for something else</Text>
+              </View>
+            )}
+          </View>
+        </View>
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#F8F9FD',
+  },
+  scrollContent: {
+    paddingBottom: 24,
+  },
+
+  // Header
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    backgroundColor: '#fff',
+  },
+  headerLeft: {
+    flex: 1,
+  },
+  headerRight: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  locationContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  locationText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+    marginLeft: 4,
+    marginRight: 2,
+  },
+  greeting: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#1A1A1A',
+    marginTop: 2,
+  },
+  iconButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#F5F5F5',
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'relative',
+  },
+  notificationDot: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#FF3B30',
+    borderWidth: 1.5,
+    borderColor: '#fff',
+  },
+
+  // Search
+  searchSection: {
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8F9FD',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 12,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 15,
+    color: '#333',
+    padding: 0,
+  },
+
+  // Section
+  section: {
+    marginTop: 24,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    marginBottom: 16,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1A1A1A',
+  },
+  seeAllText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#6C3FE4',
+  },
+
+  // Categories Grid
+  categoriesGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    paddingHorizontal: 20,
+    gap: 16,
+  },
+  categoryCard: {
+    alignItems: 'center',
+    width: (width - 72) / 3,
+    marginBottom: 8,
+  },
+  categoryCardActive: {},
+  categoryIconContainer: {
+    width: (width - 72) / 3 - 10,
+    height: (width - 72) / 3 - 10,
+    borderRadius: 12,
+    backgroundColor: '#fff',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
+    overflow: 'hidden',
+    borderWidth: 2,
+    borderColor: '#F0F0F0',
+  },
+  categoryIconActive: {
+    borderColor: '#6C3FE4',
+    backgroundColor: '#F0EBFF',
+  },
+  categoryImage: {
+    width: '100%',
+    height: '100%',
+  },
+  categoryName: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#666',
+    textAlign: 'center',
+    lineHeight: 16,
+  },
+  categoryNameActive: {
+    color: '#6C3FE4',
+    fontWeight: '600',
+  },
+
+  // Banner Slider
+  bannerListContainer: {
+    paddingLeft: 20,
+    paddingRight: 20,
+  },
+  bannerItem: {
+    width: IMAGE_WIDTH,
+    height: 180,
+    marginRight: IMAGE_SPACING,
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  bannerImage: {
+    width: '100%',
+    height: '100%',
+  },
+  bannerOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    padding: 16,
+  },
+  bannerTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#fff',
+  },
+
+  // Video Slider
+  videoListContainer: {
+    paddingLeft: 20,
+    paddingRight: 20,
+  },
+  videoItem: {
+    width: VIDEO_WIDTH,
+    marginRight: VIDEO_SPACING,
+  },
+  videoContainer: {
+    width: '100%',
+    height: 200,
+    borderRadius: 12,
+    overflow: 'hidden',
+    backgroundColor: '#000',
+    position: 'relative',
+  },
+  videoThumbnail: {
+    width: '100%',
+    height: '100%',
+  },
+  playButtonContainer: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    transform: [{ translateX: -24 }, { translateY: -24 }],
+  },
+  videoDurationBadge: {
+    position: 'absolute',
+    bottom: 8,
+    right: 8,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+  },
+  videoDurationText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  videoTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+    marginTop: 8,
+    lineHeight: 18,
+  },
+
+  // Services
+  servicesContainer: {
+    paddingHorizontal: 20,
+  },
+  serviceCard: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    marginBottom: 16,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  imageContainer: {
+    position: 'relative',
+  },
+  serviceImage: {
+    width: '100%',
+    height: 180,
+  },
+  discountBadge: {
+    position: 'absolute',
+    top: 12,
+    left: 12,
+    backgroundColor: '#FF3B30',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 6,
+  },
+  discountText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  popularBadge: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    backgroundColor: '#FF9500',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    gap: 4,
+  },
+  popularText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  serviceInfo: {
+    padding: 16,
+  },
+  serviceHeader: {
+    marginBottom: 8,
+  },
+  serviceTitleContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    gap: 8,
+  },
+  serviceName: {
+    flex: 1,
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#1A1A1A',
+    lineHeight: 22,
+  },
+  ratingBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8F9FD',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    gap: 3,
+  },
+  ratingText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#1A1A1A',
+  },
+  reviewsText: {
+    fontSize: 11,
+    color: '#999',
+  },
+  serviceDescription: {
+    fontSize: 14,
+    color: '#666',
+    lineHeight: 20,
+    marginBottom: 12,
+  },
+  serviceFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  priceSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  servicePrice: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1A1A1A',
+  },
+  originalPrice: {
+    fontSize: 14,
+    color: '#999',
+    textDecorationLine: 'line-through',
+  },
+  durationBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  durationText: {
+    fontSize: 13,
+    color: '#666',
+    fontWeight: '500',
+  },
+  bookButton: {
+    backgroundColor: '#6C3FE4',
+    borderRadius: 10,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  bookButtonText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#fff',
+  },
+
+  // Empty State
+  emptyState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 60,
+  },
+  emptyStateText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#666',
+    marginTop: 16,
+  },
+  emptyStateSubtext: {
+    fontSize: 14,
+    color: '#999',
+    marginTop: 4,
+  },
+});
