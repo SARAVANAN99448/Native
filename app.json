@@ -2,6 +2,13 @@
   "expo": {
     "name": "frontend",
     "slug": "frontend",
+    "extra": {
+      "googleClientId": "293613594811-neng7hetfger989d4pv3i75n1d5j3vjb.apps.googleusercontent.com",
+      "router": {},
+      "eas": {
+        "projectId": "c76f7480-7b21-429b-a568-361437a688e8"
+      }
+    },
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -12,6 +19,7 @@
       "supportsTablet": true
     },
     "android": {
+      "package": "app.verne.frontend",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",

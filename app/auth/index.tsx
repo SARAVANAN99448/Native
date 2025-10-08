@@ -1,3 +1,4 @@
+// app/auth/AuthScreen.tsx
 import React, { useState } from 'react';
 import {
   View,
@@ -9,6 +10,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
+  Image,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -25,7 +27,7 @@ export default function AuthScreen() {
   });
   const [loading, setLoading] = useState(false);
 
-  const { login, register } = useAuth();
+  const { login, register, googleLogin } = useAuth();
   const router = useRouter();
 
   const handleSubmit = async () => {
@@ -84,8 +86,10 @@ export default function AuthScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         <View style={styles.header}>
-          <Ionicons name="construct" size={60} color="#007AFF" />
-          <Text style={styles.title}>Urban Services</Text>
+          {/* <Ionicons name="construct" size={60} color="#007AFF" /> */}
+          <Image width={100} height={100} source={{ uri: 'https://vintenterprises.in/wp-content/uploads/2022/03/Untitled-design-99.png' }}
+/>
+          <Text style={styles.title}>Vint solar</Text>
           <Text style={styles.subtitle}>
             {isLogin ? 'Welcome back!' : 'Join our community'}
           </Text>
@@ -138,7 +142,12 @@ export default function AuthScreen() {
                         styles.roleButton,
                         formData.role === role && styles.roleButtonActive,
                       ]}
-                      onPress={() => setFormData((prev) => ({ ...prev, role: role as 'customer' | 'technician' }))}
+                      onPress={() =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          role: role as 'customer' | 'technician',
+                        }))
+                      }
                     >
                       <Text
                         style={[
@@ -165,6 +174,21 @@ export default function AuthScreen() {
             </Text>
           </TouchableOpacity>
 
+          {/* ✅ Google Sign-In Button */}
+          <TouchableOpacity
+            style={styles.googleButton}
+            onPress={async () => {
+              try {
+                await googleLogin();
+              } catch (e: any) {
+                Alert.alert("Error", e.message);
+              }
+            }}
+          >
+            <Ionicons name="logo-google" size={20} color="#DB4437" style={{ marginRight: 8 }} />
+            <Text style={styles.googleButtonText}>Continue with Google</Text>
+          </TouchableOpacity>
+
           <TouchableOpacity
             style={styles.switchButton}
             onPress={() => setIsLogin(!isLogin)}
@@ -179,33 +203,12 @@ export default function AuthScreen() {
   );
 }
 
-// your same styles (unchanged)
-
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-  },
-  header: {
-    alignItems: 'center',
-    paddingTop: 60,
-    paddingBottom: 40,
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#333',
-    marginTop: 16,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#666',
-    marginTop: 8,
-  },
-  form: {
-    flex: 1,
-    paddingHorizontal: 24,
-  },
+  container: { flex: 1, backgroundColor: '#fff' },
+  header: { alignItems: 'center', paddingTop: 60, paddingBottom: 40 },
+  title: { fontSize: 32, fontWeight: 'bold', color: '#333', marginTop: 16 },
+  subtitle: { fontSize: 16, color: '#666', marginTop: 8 },
+  form: { flex: 1, paddingHorizontal: 24 },
   input: {
     backgroundColor: '#f8f9fa',
     borderRadius: 12,
@@ -215,19 +218,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#e9ecef',
   },
-  roleSelector: {
-    marginBottom: 24,
-  },
-  roleLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 12,
-    color: '#333',
-  },
-  roleButtons: {
-    flexDirection: 'row',
-    gap: 12,
-  },
+  roleSelector: { marginBottom: 24 },
+  roleLabel: { fontSize: 16, fontWeight: '600', marginBottom: 12, color: '#333' },
+  roleButtons: { flexDirection: 'row', gap: 12 },
   roleButton: {
     flex: 1,
     padding: 16,
@@ -236,18 +229,9 @@ const styles = StyleSheet.create({
     borderColor: '#e9ecef',
     alignItems: 'center',
   },
-  roleButtonActive: {
-    borderColor: '#007AFF',
-    backgroundColor: '#007AFF10',
-  },
-  roleButtonText: {
-    fontSize: 16,
-    color: '#666',
-  },
-  roleButtonTextActive: {
-    color: '#007AFF',
-    fontWeight: '600',
-  },
+  roleButtonActive: { borderColor: '#007AFF', backgroundColor: '#007AFF10' },
+  roleButtonText: { fontSize: 16, color: '#666' },
+  roleButtonTextActive: { color: '#007AFF', fontWeight: '600' },
   submitButton: {
     backgroundColor: '#007AFF',
     borderRadius: 12,
@@ -255,20 +239,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 16,
   },
-  submitButtonDisabled: {
-    opacity: 0.6,
-  },
-  submitButtonText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  switchButton: {
+  submitButtonDisabled: { opacity: 0.6 },
+  submitButtonText: { color: '#fff', fontSize: 18, fontWeight: '600' },
+  googleButton: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
     alignItems: 'center',
-    paddingVertical: 16,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    borderColor: '#ddd',
+    borderWidth: 1,
+    marginBottom: 16,
   },
-  switchButtonText: {
-    color: '#007AFF',
-    fontSize: 16,
-  },
+  googleButtonText: { fontSize: 16, color: '#333' },
+  switchButton: { alignItems: 'center', paddingVertical: 16 },
+  switchButtonText: { color: '#007AFF', fontSize: 16 },
 });

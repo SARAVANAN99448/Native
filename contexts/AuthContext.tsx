@@ -1,9 +1,22 @@
 // contexts/AuthContext.tsx
 import React, { createContext, useContext, useEffect, useState } from "react";
-import { onAuthStateChanged, signOut, signInWithEmailAndPassword, createUserWithEmailAndPassword } from "firebase/auth";
+import {
+  onAuthStateChanged,
+  signOut,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  GoogleAuthProvider,
+  signInWithCredential,
+} from "firebase/auth";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { auth, db } from "../config/firebaseConfig";
 import { useRouter } from "expo-router";
+import * as Google from "expo-auth-session/providers/google";
+import * as WebBrowser from "expo-web-browser";
+import Constants from "expo-constants";
+import { Alert } from "react-native";
+
+WebBrowser.maybeCompleteAuthSession();
 
 const AuthContext = createContext<any>(null);
 
@@ -12,10 +25,17 @@ export const AuthProvider = ({ children }: any) => {
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
+  // ✅ Google Auth setup
+//   const [request, response, promptAsync] = Google.useAuthRequest({
+//   clientId: "",
+// });
+
+
+  // ✅ Listen for Auth state changes
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
-        // Check if customer or technician
+        // Check if user exists in Firestore
         const customerRef = doc(db, "customers", firebaseUser.uid);
         const techRef = doc(db, "technicians", firebaseUser.uid);
 
@@ -29,8 +49,15 @@ export const AuthProvider = ({ children }: any) => {
           setUser({ uid: firebaseUser.uid, role: "technician", ...techSnap.data() });
           router.replace("/technician");
         } else {
-          setUser(null);
-          router.replace("/auth");
+          // If new Google user, create default "customer" entry
+          await setDoc(doc(db, "customers", firebaseUser.uid), {
+            name: firebaseUser.displayName,
+            email: firebaseUser.email,
+            role: "customer",
+            createdAt: new Date().toISOString(),
+          });
+          setUser({ uid: firebaseUser.uid, role: "customer" });
+          router.replace("/customer");
         }
       } else {
         setUser(null);
@@ -42,7 +69,7 @@ export const AuthProvider = ({ children }: any) => {
     return unsubscribe;
   }, []);
 
-  // ✅ Signup
+  // ✅ Email signup
   const register = async ({ name, email, password, phone, role }: any) => {
     const userCred = await createUserWithEmailAndPassword(auth, email, password);
     const uid = userCred.user.uid;
@@ -57,9 +84,25 @@ export const AuthProvider = ({ children }: any) => {
     });
   };
 
-  // ✅ Login
+  // ✅ Email login
   const login = async (email: string, password: string) => {
     await signInWithEmailAndPassword(auth, email, password);
+  };
+
+  // ✅ Google login
+  const googleLogin = async () => {
+    try {
+      const result = await promptAsync();
+      if (result?.type === "success") {
+        const { id_token } = result.params;
+        const credential = GoogleAuthProvider.credential(id_token);
+        await signInWithCredential(auth, credential);
+      } else {
+        Alert.alert("Google Sign-in cancelled");
+      }
+    } catch (e: any) {
+      Alert.alert("Error", e.message);
+    }
   };
 
   // ✅ Logout
@@ -70,7 +113,7 @@ export const AuthProvider = ({ children }: any) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, register, login, logout, loading }}>
+    <AuthContext.Provider value={{ user, register, login, googleLogin, logout, loading }}>
       {children}
     </AuthContext.Provider>
   );

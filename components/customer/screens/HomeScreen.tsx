@@ -76,59 +76,59 @@ export default function HomeScreen() {
 
   const loadData = async () => {
     try {
-      // Banner Images
+      // Banner Images - Using proper Picsum/Unsplash image URLs
       const bannerList: BannerImage[] = [
         {
           id: '1',
-          image:"",
+          image: 'https://images.unsplash.com/photo-1621905251189-08b45d6a269e?w=900&h=500&fit=crop&q=80',
           title: 'Summer Sale',
         },
         {
           id: '2',
-          image: 'https://source.unsplash.com/900x500/?cleaning,promotion',
+          image: 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=900&h=500&fit=crop&q=80',
           title: 'Deep Cleaning Offer',
         },
         {
           id: '3',
-          image: 'https://source.unsplash.com/900x500/?salon,beauty',
+          image: 'https://images.unsplash.com/photo-1560066984-138dadb4c035?w=900&h=500&fit=crop&q=80',
           title: 'Beauty Services',
         },
         {
           id: '4',
-          image: 'https://source.unsplash.com/900x500/?repair,service',
+          image: 'https://images.unsplash.com/photo-1635274853671-e5ce921b5264?w=900&h=500&fit=crop&q=80',
           title: 'AC Service Deal',
         },
       ];
 
-      // Videos
+      // Videos - Using proper image URLs
       const videoList: VideoItem[] = [
         {
           id: '1',
-          thumbnail: 'https://source.unsplash.com/400x600/?cleaning,professional',
+          thumbnail: 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=400&h=600&fit=crop&q=80',
           title: 'How We Clean Your Home',
           duration: '2:30',
         },
         {
           id: '2',
-          thumbnail: 'https://source.unsplash.com/400x600/?salon,beauty',
+          thumbnail: 'https://images.unsplash.com/photo-1560066984-138dadb4c035?w=400&h=600&fit=crop&q=80',
           title: 'Salon Services at Home',
           duration: '1:45',
         },
         {
           id: '3',
-          thumbnail: 'https://source.unsplash.com/400x600/?ac-repair',
+          thumbnail: 'https://images.unsplash.com/photo-1621905251189-08b45d6a269e?w=400&h=600&fit=crop&q=80',
           title: 'AC Repair Guide',
           duration: '3:10',
         },
         {
           id: '4',
-          thumbnail: 'https://source.unsplash.com/400x600/?electrician',
+          thumbnail: 'https://images.unsplash.com/photo-1621905252507-b35492cc74b4?w=400&h=600&fit=crop&q=80',
           title: 'Safety Tips & Guidelines',
           duration: '2:15',
         },
         {
           id: '5',
-          thumbnail: 'https://source.unsplash.com/400x600/?plumber',
+          thumbnail: 'https://images.unsplash.com/photo-1607472586893-edb57bdc0e39?w=400&h=600&fit=crop&q=80',
           title: 'Plumbing Solutions',
           duration: '1:55',
         },
@@ -138,37 +138,37 @@ export default function HomeScreen() {
         {
           id: '1',
           name: 'AC Repair',
-          image: 'https://source.unsplash.com/400x400/?air-conditioner',
+          image: 'https://images.unsplash.com/photo-1621905252507-b35492cc74b4?w=400&h=400&fit=crop&q=80',
           icon: 'snow',
         },
         {
           id: '2',
           name: 'Salon for Women',
-          image: 'https://source.unsplash.com/400x400/?salon,women',
+          image: 'https://images.unsplash.com/photo-1560066984-138dadb4c035?w=400&h=400&fit=crop&q=80',
           icon: 'cut',
         },
         {
           id: '3',
           name: 'Home Cleaning',
-          image: 'https://source.unsplash.com/400x400/?cleaning',
+          image: 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=400&h=400&fit=crop&q=80',
           icon: 'sparkles',
         },
         {
           id: '4',
           name: 'Electrician',
-          image: 'https://source.unsplash.com/400x400/?electrician',
+          image: 'https://images.unsplash.com/photo-1621905252507-b35492cc74b4?w=400&h=400&fit=crop&q=80',
           icon: 'flash',
         },
         {
           id: '5',
           name: 'Plumber',
-          image: 'https://source.unsplash.com/400x400/?plumber',
+          image: 'https://images.unsplash.com/photo-1607472586893-edb57bdc0e39?w=400&h=400&fit=crop&q=80',
           icon: 'water',
         },
         {
           id: '6',
           name: 'Painter',
-          image: 'https://source.unsplash.com/400x400/?painter',
+          image: 'https://images.unsplash.com/photo-1589939705384-5185137a7f0f?w=400&h=400&fit=crop&q=80',
           icon: 'color-palette',
         },
       ];
@@ -184,7 +184,7 @@ export default function HomeScreen() {
           duration: 150,
           rating: 4.76,
           reviews: 470000,
-          image: 'https://source.unsplash.com/800x600/?air-conditioner,repair',
+          image: 'https://images.unsplash.com/photo-1621905251189-08b45d6a269e?w=800&h=600&fit=crop&q=80',
           discount: 25,
           popular: true,
         },
@@ -197,7 +197,7 @@ export default function HomeScreen() {
           duration: 90,
           rating: 4.78,
           reviews: 285000,
-          image: 'https://source.unsplash.com/800x600/?air-conditioning,technician',
+          image: 'https://images.unsplash.com/photo-1621905252507-b35492cc74b4?w=800&h=600&fit=crop&q=80',
         },
         {
           id: '3',
@@ -208,7 +208,7 @@ export default function HomeScreen() {
           duration: 120,
           rating: 4.70,
           reviews: 109000,
-          image: 'https://source.unsplash.com/800x600/?ac-installation,technician',
+          image: 'https://images.unsplash.com/photo-1631545835208-cf04eace5b0a?w=800&h=600&fit=crop&q=80',
         },
 
         // SALON FOR WOMEN SERVICES
@@ -221,7 +221,7 @@ export default function HomeScreen() {
           duration: 45,
           rating: 4.85,
           reviews: 524000,
-          image: 'https://source.unsplash.com/800x600/?hairstyle,salon',
+          image: 'https://images.unsplash.com/photo-1560066984-138dadb4c035?w=800&h=600&fit=crop&q=80',
           popular: true,
         },
         {
@@ -233,7 +233,7 @@ export default function HomeScreen() {
           duration: 60,
           rating: 4.89,
           reviews: 687000,
-          image: 'https://source.unsplash.com/800x600/?facial,beauty',
+          image: 'https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?w=800&h=600&fit=crop&q=80',
           discount: 30,
         },
         {
@@ -245,7 +245,7 @@ export default function HomeScreen() {
           duration: 50,
           rating: 4.83,
           reviews: 945000,
-          image: 'https://source.unsplash.com/800x600/?beauty-salon,waxing',
+          image: 'https://images.unsplash.com/photo-1519415510236-718bdfcd89c8?w=800&h=600&fit=crop&q=80',
         },
         {
           id: '7',
@@ -256,7 +256,7 @@ export default function HomeScreen() {
           duration: 75,
           rating: 4.87,
           reviews: 412000,
-          image: 'https://source.unsplash.com/800x600/?hair-spa,salon',
+          image: 'https://images.unsplash.com/photo-1562322140-8baeececf3df?w=800&h=600&fit=crop&q=80',
           popular: true,
         },
         {
@@ -268,7 +268,7 @@ export default function HomeScreen() {
           duration: 60,
           rating: 4.81,
           reviews: 623000,
-          image: 'https://source.unsplash.com/800x600/?manicure,pedicure',
+          image: 'https://images.unsplash.com/photo-1604654894610-df63bc536371?w=800&h=600&fit=crop&q=80',
           discount: 20,
         },
         {
@@ -280,7 +280,7 @@ export default function HomeScreen() {
           duration: 180,
           rating: 4.92,
           reviews: 89000,
-          image: 'https://source.unsplash.com/800x600/?bridal-makeup',
+          image: 'https://images.unsplash.com/photo-1487412947147-5cebf100ffc2?w=800&h=600&fit=crop&q=80',
         },
 
         // HOME CLEANING SERVICES
@@ -293,7 +293,7 @@ export default function HomeScreen() {
           duration: 120,
           rating: 4.82,
           reviews: 1500000,
-          image: 'https://source.unsplash.com/800x600/?bathroom-cleaning',
+          image: 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=800&h=600&fit=crop&q=80',
           popular: true,
         },
         {
@@ -305,7 +305,7 @@ export default function HomeScreen() {
           duration: 150,
           rating: 4.79,
           reviews: 1230000,
-          image: 'https://source.unsplash.com/800x600/?kitchen-cleaning',
+          image: 'https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=800&h=600&fit=crop&q=80',
           discount: 15,
         },
         {
@@ -317,7 +317,7 @@ export default function HomeScreen() {
           duration: 240,
           rating: 4.84,
           reviews: 892000,
-          image: 'https://source.unsplash.com/800x600/?home-cleaning,professional',
+          image: 'https://images.unsplash.com/photo-1527515637462-cff94eecc1ac?w=800&h=600&fit=crop&q=80',
         },
         {
           id: '13',
@@ -328,7 +328,7 @@ export default function HomeScreen() {
           duration: 90,
           rating: 4.77,
           reviews: 567000,
-          image: 'https://source.unsplash.com/800x600/?sofa-cleaning',
+          image: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=800&h=600&fit=crop&q=80',
           discount: 10,
         },
         {
@@ -340,7 +340,7 @@ export default function HomeScreen() {
           duration: 300,
           rating: 4.80,
           reviews: 234000,
-          image: 'https://source.unsplash.com/800x600/?house-cleaning',
+          image: 'https://images.unsplash.com/photo-1628177142898-93e36e4e3a50?w=800&h=600&fit=crop&q=80',
         },
 
         // OTHER SERVICES
@@ -353,7 +353,7 @@ export default function HomeScreen() {
           duration: 45,
           rating: 4.71,
           reviews: 345000,
-          image: 'https://source.unsplash.com/800x600/?electrician,tools',
+          image: 'https://images.unsplash.com/photo-1621905252507-b35492cc74b4?w=800&h=600&fit=crop&q=80',
         },
         {
           id: '16',
@@ -364,7 +364,7 @@ export default function HomeScreen() {
           duration: 40,
           rating: 4.68,
           reviews: 456000,
-          image: 'https://source.unsplash.com/800x600/?plumber,tools',
+          image: 'https://images.unsplash.com/photo-1607472586893-edb57bdc0e39?w=800&h=600&fit=crop&q=80',
         },
         {
           id: '17',
@@ -375,7 +375,7 @@ export default function HomeScreen() {
           duration: 180,
           rating: 4.75,
           reviews: 178000,
-          image: 'https://source.unsplash.com/800x600/?painter,painting',
+          image: 'https://images.unsplash.com/photo-1589939705384-5185137a7f0f?w=800&h=600&fit=crop&q=80',
           discount: 15,
         },
       ];
@@ -423,7 +423,11 @@ export default function HomeScreen() {
       activeOpacity={0.9}
       onPress={() => Alert.alert('Banner', item.title)}
     >
-      <Image source={{ uri: item.image }} style={styles.bannerImage} />
+      <Image 
+        source={{ uri: item.image }} 
+        style={styles.bannerImage}
+        resizeMode="cover"
+      />
       <View style={styles.bannerOverlay}>
         <Text style={styles.bannerTitle}>{item.title}</Text>
       </View>
@@ -437,7 +441,11 @@ export default function HomeScreen() {
       onPress={() => Alert.alert('Video', item.title)}
     >
       <View style={styles.videoContainer}>
-        <Image source={{ uri: item.thumbnail }} style={styles.videoThumbnail} />
+        <Image 
+          source={{ uri: item.thumbnail }} 
+          style={styles.videoThumbnail}
+          resizeMode="cover"
+        />
         <View style={styles.playButtonContainer}>
           <Ionicons name="play-circle" size={48} color="#fff" />
         </View>
@@ -459,7 +467,11 @@ export default function HomeScreen() {
       onPress={() => Alert.alert('Service Selected', `Selected: ${item.name}`)}
     >
       <View style={styles.imageContainer}>
-        <Image source={{ uri: item.image }} style={styles.serviceImage} />
+        <Image 
+          source={{ uri: item.image }} 
+          style={styles.serviceImage}
+          resizeMode="cover"
+        />
         {item.discount && (
           <View style={styles.discountBadge}>
             <Text style={styles.discountText}>{item.discount}% OFF</Text>
@@ -589,7 +601,11 @@ export default function HomeScreen() {
                     selectedCategory === category.name && styles.categoryIconActive,
                   ]}
                 >
-                  <Image source={{ uri: category.image }} style={styles.categoryImage} />
+                  <Image 
+                    source={{ uri: category.image }} 
+                    style={styles.categoryImage}
+                    resizeMode="cover"
+                  />
                 </View>
                 <Text
                   style={[
@@ -677,6 +693,7 @@ export default function HomeScreen() {
   );
 }
 
+// Styles remain exactly the same
 const styles = StyleSheet.create({
   container: {
     flex: 1,
