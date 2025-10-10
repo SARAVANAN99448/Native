@@ -3,7 +3,10 @@
     "name": "frontend",
     "slug": "frontend",
     "extra": {
-      "googleClientId": "293613594811-neng7hetfger989d4pv3i75n1d5j3vjb.apps.googleusercontent.com",
+      "clientId": "1080097552471-hp3dg4afltchb258pmmgofh36jgmct3t.apps.googleusercontent.com",
+      "iosClientId": "YOUR_IOS_CLIENT_ID.apps.googleusercontent.com",
+      "androidClientId": "293613594811-pcv35nh7tnkbafap0hbpqo3vvuka1l9b.apps.googleusercontent.com",
+      "webClientId": "1080097552471-i1nkgpog78cvhgqdiuqqskmhrt3d1gpj.apps.googleusercontent.com",
       "router": {},
       "eas": {
         "projectId": "c76f7480-7b21-429b-a568-361437a688e8"
@@ -19,7 +22,7 @@
       "supportsTablet": true
     },
     "android": {
-      "package": "app.verne.frontend",
+      "package": "app.vernure.frontend",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",

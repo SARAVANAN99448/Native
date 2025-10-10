@@ -7,14 +7,22 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:1080097552471:android:541f9250f0c17cd6178b12",
+        "mobilesdk_app_id": "1:1080097552471:android:2f1d101b22a8b45a178b12",
         "android_client_info": {
-          "package_name": "A.new.app"
+          "package_name": "app.vernure.frontend"
         }
       },
       "oauth_client": [
         {
-          "client_id": "293613594811-pcv35nh7tnkbafap0hbpqo3vvuka1l9b.apps.googleusercontent.com",
+          "client_id": "1080097552471-3l82blphsq73d68phn0207p2j7e0qgf5.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "app.vernure.frontend",
+            "certificate_hash": "6f377baf59742dfb4b73eb5c259d6191201b63d5"
+          }
+        },
+        {
+          "client_id": "1080097552471-i1nkgpog78cvhgqdiuqqskmhrt3d1gpj.apps.googleusercontent.com",
           "client_type": 3
         }
       ],
@@ -27,7 +35,7 @@
         "appinvite_service": {
           "other_platform_oauth_client": [
             {
-              "client_id": "293613594811-pcv35nh7tnkbafap0hbpqo3vvuka1l9b.apps.googleusercontent.com",
+              "client_id": "1080097552471-i1nkgpog78cvhgqdiuqqskmhrt3d1gpj.apps.googleusercontent.com",
               "client_type": 3
             }
           ]

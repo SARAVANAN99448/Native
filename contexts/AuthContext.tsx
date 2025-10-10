@@ -26,21 +26,23 @@ export const AuthProvider = ({ children }: any) => {
   const router = useRouter();
 
   // ✅ Google Auth setup
-//   const [request, response, promptAsync] = Google.useAuthRequest({
-//   clientId: "",
-// });
+  const [request, response, promptAsync] = Google.useAuthRequest({
+    clientId:"1080097552471-hp3dg4afltchb258pmmgofh36jgmct3t.apps.googleusercontent.com",
+    androidClientId:"293613594811-pcv35nh7tnkbafap0hbpqo3vvuka1l9b.apps.googleusercontent.com",
+    webClientId: "293613594811-neng7hetfger989d4pv3i75n1d5j3vjb.apps.googleusercontent.com",
+  });
 
-
-  // ✅ Listen for Auth state changes
+  // ✅ Firebase Auth listener
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
-        // Check if user exists in Firestore
         const customerRef = doc(db, "customers", firebaseUser.uid);
         const techRef = doc(db, "technicians", firebaseUser.uid);
 
-        const customerSnap = await getDoc(customerRef);
-        const techSnap = await getDoc(techRef);
+        const [customerSnap, techSnap] = await Promise.all([
+          getDoc(customerRef),
+          getDoc(techRef),
+        ]);
 
         if (customerSnap.exists()) {
           setUser({ uid: firebaseUser.uid, role: "customer", ...customerSnap.data() });
@@ -49,7 +51,7 @@ export const AuthProvider = ({ children }: any) => {
           setUser({ uid: firebaseUser.uid, role: "technician", ...techSnap.data() });
           router.replace("/technician");
         } else {
-          // If new Google user, create default "customer" entry
+          // Create default Firestore entry for new Google user
           await setDoc(doc(db, "customers", firebaseUser.uid), {
             name: firebaseUser.displayName,
             email: firebaseUser.email,
@@ -93,6 +95,7 @@ export const AuthProvider = ({ children }: any) => {
   const googleLogin = async () => {
     try {
       const result = await promptAsync();
+
       if (result?.type === "success") {
         const { id_token } = result.params;
         const credential = GoogleAuthProvider.credential(id_token);
