@@ -1,0 +1,69 @@
+{
+  "project_info": {
+    "project_number": "519474355253",
+    "project_id": "vint-dee9e",
+    "storage_bucket": "vint-dee9e.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+<<<<<<< HEAD:google-services.json
+        "mobilesdk_app_id": "1:519474355253:android:cf1ad2e1e41543efdd657c",
+        "android_client_info": {
+          "package_name": "app.vernure.vint"
+=======
+        "mobilesdk_app_id": "1:1080097552471:android:2f1d101b22a8b45a178b12",
+        "android_client_info": {
+          "package_name": "app.vernure.frontend"
+>>>>>>> 42d5940a13d08a73c6a3681613aba9bd04a25fdb:app/google-services.json
+        }
+      },
+      "oauth_client": [
+        {
+<<<<<<< HEAD:google-services.json
+          "client_id": "519474355253-4j1itdp5efst9fumi1e62j2oknrn6mfe.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "app.vernure.vint",
+            "certificate_hash": "732ad8a4507e7260e340046d7cf4d93ff58cda92"
+          }
+        },
+        {
+          "client_id": "519474355253-a36ki7135cajbbff6qgq752boteqedgc.apps.googleusercontent.com",
+=======
+          "client_id": "1080097552471-3l82blphsq73d68phn0207p2j7e0qgf5.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "app.vernure.frontend",
+            "certificate_hash": "6f377baf59742dfb4b73eb5c259d6191201b63d5"
+          }
+        },
+        {
+          "client_id": "1080097552471-i1nkgpog78cvhgqdiuqqskmhrt3d1gpj.apps.googleusercontent.com",
+>>>>>>> 42d5940a13d08a73c6a3681613aba9bd04a25fdb:app/google-services.json
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCBzAJqvIfQlf85iEvVKm4oDH8iXf6T__A"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+<<<<<<< HEAD:google-services.json
+              "client_id": "519474355253-a36ki7135cajbbff6qgq752boteqedgc.apps.googleusercontent.com",
+=======
+              "client_id": "1080097552471-i1nkgpog78cvhgqdiuqqskmhrt3d1gpj.apps.googleusercontent.com",
+>>>>>>> 42d5940a13d08a73c6a3681613aba9bd04a25fdb:app/google-services.json
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
