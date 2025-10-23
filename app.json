@@ -56,11 +56,8 @@
       "@react-native-firebase/auth",
       "@react-native-firebase/crashlytics",
       "@react-native-google-signin/google-signin",
-      
       [
         "expo-splash-screen",
-        
-        
         {
           "image": "./assets/images/splash-image.png",
           "imageWidth": 200,

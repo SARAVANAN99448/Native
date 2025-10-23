@@ -297,7 +297,7 @@ export default function PaymentMethodsScreen() {
 
   const renderPaymentMethodCard = (method: PaymentMethod) => {
     return (
-      <View key={method.id} style={styles.paymentCard}>
+      <View  style={styles.paymentCard}>
         <View style={styles.paymentHeader}>
           <View style={styles.paymentIcon}>
             <Ionicons
@@ -639,9 +639,9 @@ export default function PaymentMethodsScreen() {
       </Modal>
 
       {/* Razorpay Script for Web */}
-      {Platform.OS === 'web' && (
+      {/* {Platform.OS === 'web' && (
         <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
-      )}
+      )} */}
     </SafeAreaView>
   );
 }

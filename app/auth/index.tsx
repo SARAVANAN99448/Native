@@ -14,8 +14,8 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { useRouter } from "expo-router";
-import { useAuth } from "../../contexts/AuthContext";
-import { FirebaseRecaptchaVerifierModal } from "expo-firebase-recaptcha";
+import { useAuth } from "../../contexts/AuthContext"; 
+import auth from '@react-native-firebase/auth';
 
 export default function AuthScreen() {
   const [isLogin, setIsLogin] = useState(true);
@@ -30,9 +30,10 @@ export default function AuthScreen() {
   const [otpSent, setOtpSent] = useState(false);
   const [otp, setOtp] = useState("");
   const [loading, setLoading] = useState(false);
+  const [verificationId, setVerificationId] = useState<string | null>(null);
 
-  const { login, register, sendOTP, verifyOTP, googleLogin, recaptchaVerifier, app } = useAuth();
   const router = useRouter();
+  const { login, register, googleLogin } = useAuth(); // adjust if needed
 
   // EMAIL AUTH
   const handleEmailAuth = async () => {
@@ -73,7 +74,8 @@ export default function AuthScreen() {
     if (!otpSent) {
       try {
         setLoading(true);
-        await sendOTP(formData.phone);
+        const confirmation = await auth().signInWithPhoneNumber(formData.phone);
+        setVerificationId(confirmation.verificationId);
         setOtpSent(true);
         Alert.alert("OTP Sent", "Check your phone for the verification code.");
       } catch (error: any) {
@@ -85,9 +87,12 @@ export default function AuthScreen() {
       if (!otp || otp.length !== 6) return Alert.alert("Invalid OTP", "Enter 6-digit OTP");
       try {
         setLoading(true);
-        await verifyOTP(otp);
-        Alert.alert("Success", "Phone verified successfully!");
-        router.replace("/");
+        if (verificationId) {
+          const credential = auth.PhoneAuthProvider.credential(verificationId, otp);
+          await auth().signInWithCredential(credential);
+          Alert.alert("Success", "Phone verified successfully!");
+          router.replace("/");
+        }
       } catch (error: any) {
         Alert.alert("Verification Failed", error.message || "Invalid OTP");
       } finally {
@@ -251,7 +256,7 @@ export default function AuthScreen() {
             {otpSent ? (
               <TouchableOpacity
                 style={styles.switchButton}
-                onPress={() => { setOtpSent(false); setOtp(""); }}
+                onPress={() => { setOtpSent(false); setOtp(""); setVerificationId(null); }}
                 disabled={loading}
               >
                 <Text style={styles.switchButtonText}>← Back to Phone Number</Text>
@@ -268,22 +273,7 @@ export default function AuthScreen() {
               </TouchableOpacity>
             )}
           </View>
-
-          {/* Web reCAPTCHA */}
-          {Platform.OS === "web" && authMethod === "phone" && (
-            <div id="recaptcha-container" style={{ marginTop: 20, minHeight: 78 }} />
-          )}
-
         </ScrollView>
-
-        {/* Mobile reCAPTCHA - FIXED */}
-        {Platform.OS !== "web" && recaptchaVerifier && (
-          <FirebaseRecaptchaVerifierModal
-            ref={recaptchaVerifier}
-            firebaseConfig={app.options}
-            attemptInvisibleVerification={true}
-          />
-        )}
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
