@@ -112,7 +112,6 @@ export default function AuthScreen() {
       <KeyboardAvoidingView
         style={styles.container}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
         <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
           {/* Header */}
@@ -190,20 +189,14 @@ export default function AuthScreen() {
                     placeholder="Phone (+91XXXXXXXXXX)"
                     value={formData.phone}
                     onChangeText={(text) => {
-                      // Remove any non-digit characters except '+'
                       let cleaned = text.replace(/[^\d]/g, "");
-
-                      // Remove leading 91 if user already typed it
                       if (cleaned.startsWith("91")) cleaned = cleaned.slice(2);
-
-                      // Limit to 10 digits
                       cleaned = cleaned.slice(0, 10);
-
-                      // Always prepend +91 once
                       setFormData({ ...formData, phone: "+91" + cleaned });
                     }}
                     keyboardType="phone-pad"
                     maxLength={13}
+                    editable={!loading}
                   />
                 ) : (
                   <>
@@ -283,8 +276,8 @@ export default function AuthScreen() {
 
         </ScrollView>
 
-        {/* Mobile reCAPTCHA */}
-        {Platform.OS !== "web" && (
+        {/* Mobile reCAPTCHA - FIXED */}
+        {Platform.OS !== "web" && recaptchaVerifier && (
           <FirebaseRecaptchaVerifierModal
             ref={recaptchaVerifier}
             firebaseConfig={app.options}
@@ -323,7 +316,6 @@ const styles = StyleSheet.create({
   form: { flex: 1, paddingHorizontal: 24 },
   input: {
     backgroundColor: "#f8f9fa",
-    backgroundColor: "#f8f9fa",
     borderRadius: 12,
     padding: 16,
     fontSize: 16,
@@ -343,10 +335,8 @@ const styles = StyleSheet.create({
   phoneNumber: { fontSize: 18, fontWeight: "600", color: "#007AFF" },
   submitButton: {
     backgroundColor: "#007AFF",
-    backgroundColor: "#007AFF",
     borderRadius: 12,
     padding: 16,
-    alignItems: "center",
     alignItems: "center",
     marginBottom: 16,
     minHeight: 56,

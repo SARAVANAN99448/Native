@@ -228,7 +228,7 @@ export default function ProfileScreen() {
 
         {/* App Info */}
         <View style={styles.appInfo}>
-          <Text style={styles.appInfoText}>Urban Services v1.0.0</Text>
+          <Text style={styles.appInfoText}>Urban  v1.0.0</Text>
           <Text style={styles.appInfoText}>Service Provider App</Text>
         </View>
       </ScrollView>

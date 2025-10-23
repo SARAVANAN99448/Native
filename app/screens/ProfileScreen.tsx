@@ -16,15 +16,14 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { useAuth } from '../../../contexts/AuthContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { signOut } from 'firebase/auth';
-import { auth } from '../../../config/firebaseConfig';
+import { auth } from '../../config/firebaseConfig';
 import { useRouter } from 'expo-router';
 import { ComponentProps } from 'react';
 
 type IoniconName = ComponentProps<typeof Ionicons>['name'];
 
-// Mock user stats
 type UserStats = {
   totalBookings: number;
   totalSpent: number;
@@ -32,7 +31,6 @@ type UserStats = {
   memberSince: string;
 };
 
-// MenuItem type
 type MenuItem = {
   id: number;
   title: string;
@@ -51,12 +49,11 @@ type MenuSection = {
 };
 
 export default function ProfileScreen() {
-  const { user, setUser, setVerificationId } = useAuth();
+  const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const router = useRouter();
 
-  // State for user stats
   const [userStats, setUserStats] = useState<UserStats>({
     totalBookings: 12,
     totalSpent: 15420,
@@ -64,15 +61,8 @@ export default function ProfileScreen() {
     memberSince: 'Jan 2024',
   });
 
-  // Profile image state
   const [profileImage, setProfileImage] = useState<string | null>(user?.profilePhoto || null);
-
-  // Settings states
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
-  const [emailNotifications, setEmailNotifications] = useState(true);
-  const [smsNotifications, setSmsNotifications] = useState(false);
-
-  // Modal states
   const [showEditModal, setShowEditModal] = useState(false);
   const [editName, setEditName] = useState(user?.name || '');
   const [editEmail, setEditEmail] = useState(user?.email || '');
@@ -86,7 +76,7 @@ export default function ProfileScreen() {
     if (Platform.OS !== 'web') {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('Permission Required', 'Please allow access to your photo library to upload profile pictures.');
+        Alert.alert('Permission Required', 'Please allow access to your photo library.');
       }
     }
   };
@@ -102,27 +92,17 @@ export default function ProfileScreen() {
 
   const handleImageUpload = () => {
     Alert.alert('Upload Photo', 'Choose an option', [
-      {
-        text: 'Take Photo',
-        onPress: () => openCamera(),
-      },
-      {
-        text: 'Choose from Library',
-        onPress: () => openImageLibrary(),
-      },
-      {
-        text: 'Cancel',
-        style: 'cancel',
-      },
+      { text: 'Take Photo', onPress: () => openCamera() },
+      { text: 'Choose from Library', onPress: () => openImageLibrary() },
+      { text: 'Cancel', style: 'cancel' },
     ]);
   };
 
   const openCamera = async () => {
     try {
       const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
-
       if (permissionResult.granted === false) {
-        Alert.alert('Permission Required', 'Camera permission is required to take photos.');
+        Alert.alert('Permission Required', 'Camera permission is required.');
         return;
       }
 
@@ -137,7 +117,6 @@ export default function ProfileScreen() {
         uploadProfileImage(result.assets[0].uri);
       }
     } catch (error) {
-      console.error('Error opening camera:', error);
       Alert.alert('Error', 'Failed to open camera');
     }
   };
@@ -155,7 +134,6 @@ export default function ProfileScreen() {
         uploadProfileImage(result.assets[0].uri);
       }
     } catch (error) {
-      console.error('Error opening image library:', error);
       Alert.alert('Error', 'Failed to open image library');
     }
   };
@@ -163,21 +141,10 @@ export default function ProfileScreen() {
   const uploadProfileImage = async (uri: string) => {
     setUploadingImage(true);
     try {
-      // In a real app, you would upload to Firebase Storage or your backend
-      // For now, we'll just update the local state
-      
-      // Simulate upload delay
       await new Promise(resolve => setTimeout(resolve, 1000));
-
-      // Update profile image
       setProfileImage(uri);
-      
-      // Update user in auth context (if you have setUser method)
-      // setUser({ ...user, profilePhoto: uri });
-
       Alert.alert('Success', 'Profile photo updated successfully!');
     } catch (error) {
-      console.error('Error uploading image:', error);
       Alert.alert('Error', 'Failed to upload profile photo');
     } finally {
       setUploadingImage(false);
@@ -237,12 +204,14 @@ export default function ProfileScreen() {
     setShowEditModal(false);
   };
 
+  // ✅ Navigate to Address Management Screen
   const handleManageAddresses = () => {
-    Alert.alert('Manage Addresses', 'Navigate to address management screen');
+    router.push('/screens/AddressesScreen');
   };
 
+  // ✅ Navigate to Payment Methods Screen
   const handlePaymentMethods = () => {
-    Alert.alert('Payment Methods', 'Navigate to payment methods screen');
+    router.push('/screens/PaymentMethodsScreen');
   };
 
   const handleNotificationSettings = () => {
@@ -250,7 +219,7 @@ export default function ProfileScreen() {
   };
 
   const handleWallet = () => {
-    Alert.alert('Wallet', 'View your wallet balance and transactions');
+    router.push('/screens/WalletScreen');
   };
 
   const handleRewards = () => {
@@ -266,14 +235,6 @@ export default function ProfileScreen() {
         { text: 'Share Code', onPress: () => Alert.alert('Shared', 'Referral code shared!') },
       ]
     );
-  };
-
-  const handleLanguage = () => {
-    Alert.alert('Language', 'Select your preferred language', [
-      { text: 'English', onPress: () => Alert.alert('Language', 'English selected') },
-      { text: 'Hindi', onPress: () => Alert.alert('Language', 'Hindi selected') },
-      { text: 'Cancel', style: 'cancel' },
-    ]);
   };
 
   const handlePrivacyPolicy = () => {
@@ -292,7 +253,7 @@ export default function ProfileScreen() {
   };
 
   const handleShareApp = () => {
-    Alert.alert('Share App', 'Share Urban Services with your friends!');
+    Alert.alert('Share App', 'Share Vint Services with your friends!');
   };
 
   const handleDeleteAccount = () => {
@@ -310,6 +271,7 @@ export default function ProfileScreen() {
     );
   };
 
+  // ✅ REMOVED LANGUAGE SECTION
   const menuSections: MenuSection[] = [
     {
       title: 'Account',
@@ -322,7 +284,7 @@ export default function ProfileScreen() {
         },
         {
           id: 2,
-          title: 'Addresses',
+          title: 'Manage Addresses',
           icon: 'location-outline',
           action: handleManageAddresses,
           badge: '2',
@@ -372,13 +334,6 @@ export default function ProfileScreen() {
           switchValue: notificationsEnabled,
           onSwitchToggle: setNotificationsEnabled,
         },
-        {
-          id: 8,
-          title: 'Language',
-          icon: 'language-outline',
-          action: handleLanguage,
-          subtitle: 'English',
-        },
       ],
     },
     {
@@ -388,7 +343,7 @@ export default function ProfileScreen() {
           id: 9,
           title: 'Help & Support',
           icon: 'help-circle-outline',
-          action: () => Alert.alert('Help & Support', 'Contact us at support@urbanservices.com'),
+          action: () => Alert.alert('Help & Support', 'Contact us at support@vint.com'),
         },
         {
           id: 10,
@@ -423,7 +378,7 @@ export default function ProfileScreen() {
           id: 14,
           title: 'About',
           icon: 'information-circle-outline',
-          action: () => Alert.alert('About', 'Urban Services v1.0.0\nMember since: ' + userStats.memberSince),
+          action: () => Alert.alert('About', 'Vint Services v1.0.0\nMember since: ' + userStats.memberSince),
         },
       ],
     },
@@ -473,7 +428,7 @@ export default function ProfileScreen() {
 
         {/* Stats */}
         <View style={styles.statsContainer}>
-          <TouchableOpacity style={styles.statItem} onPress={() => Alert.alert('Bookings', 'View all bookings')}>
+          <TouchableOpacity style={styles.statItem} onPress={() => router.push('/')}>
             <Text style={styles.statNumber}>{userStats.totalBookings}</Text>
             <Text style={styles.statLabel}>Bookings</Text>
           </TouchableOpacity>
@@ -548,8 +503,7 @@ export default function ProfileScreen() {
                         value={item.switchValue}
                         onValueChange={item.onSwitchToggle}
                         trackColor={{ false: '#ccc', true: '#007AFF' }}
-                        thumbColor="#fff"
-                      />
+                        thumbColor="#fff" />
                     ) : (
                       <Ionicons name="chevron-forward" size={20} color="#ccc" />
                     )}
@@ -574,7 +528,7 @@ export default function ProfileScreen() {
 
         {/* App Info */}
         <View style={styles.appInfo}>
-          <Text style={styles.appInfoText}>Urban Services v1.0.0</Text>
+          <Text style={styles.appInfoText}>Vint Services v1.0.0</Text>
           <Text style={styles.appInfoText}>Member since {userStats.memberSince}</Text>
           <Text style={styles.appInfoText}>Made with ❤️ for better services</Text>
         </View>
@@ -625,6 +579,7 @@ export default function ProfileScreen() {
     </SafeAreaView>
   );
 }
+
 
 // Styles remain the same as before
 const styles = StyleSheet.create({

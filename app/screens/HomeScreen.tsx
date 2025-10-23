@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -15,8 +15,9 @@ import {
   Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useAuth } from '../../../contexts/AuthContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { router } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width } = Dimensions.get('window');
 const IMAGE_WIDTH = width * 0.75;
@@ -67,7 +68,6 @@ export default function HomeScreen() {
   const [bannerImages, setBannerImages] = useState<BannerImage[]>([]);
   const [videos, setVideos] = useState<VideoItem[]>([]);
   
-  // New states for Urban Company features
   const [showLocationModal, setShowLocationModal] = useState(false);
   const [savedAddresses, setSavedAddresses] = useState<Address[]>([
     { id: '1', label: 'Home', address: 'MG Road, Bangalore', isDefault: true },
@@ -158,187 +158,28 @@ export default function HomeScreen() {
         },
         // {
         //   id: '2',
-        //   name: 'AC Deep Cleaning',
-        //   category: 'AC Repair',
-        //   description: 'Deep cleaning with foam jet technology for split/window AC',
-        //   price: 599,
-        //   duration: 90,
-        //   rating: 4.78,
-        //   reviews: 285000,
-        //   image: 'https://images.unsplash.com/photo-1621905252507-b35492cc74b4?w=800&h=600&fit=crop&q=80',
+        //   name: 'Home Deep Cleaning',
+        //   category: 'Cleaning',
+        //   description: 'Professional deep cleaning service for your entire home',
+        //   price: 1499,
+        //   duration: 180,
+        //   rating: 4.85,
+        //   reviews: 523000,
+        //   image: 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=800&h=600&fit=crop&q=80',
+        //   discount: 20,
+        //   popular: true,
         // },
         // {
         //   id: '3',
-        //   name: 'AC Installation & Uninstallation',
-        //   category: 'AC Repair',
-        //   description: 'Professional split AC installation with pipe & drainage setup',
-        //   price: 1699,
-        //   duration: 120,
-        //   rating: 4.70,
-        //   reviews: 109000,
-        //   image: 'https://images.unsplash.com/photo-1631545835208-cf04eace5b0a?w=800&h=600&fit=crop&q=80',
-        // },
-        // {
-        //   id: '4',
         //   name: 'Hair Cut & Styling',
-        //   category: 'Salon for Women',
-        //   description: 'Professional haircut with styling by expert beauticians',
+        //   category: 'Salon',
+        //   description: 'Professional haircut and styling at your doorstep',
         //   price: 399,
         //   duration: 45,
-        //   rating: 4.85,
-        //   reviews: 524000,
-        //   image: 'https://images.unsplash.com/photo-1560066984-138dadb4c035?w=800&h=600&fit=crop&q=80',
-        //   popular: true,
-        // },
-        // {
-        //   id: '5',
-        //   name: 'Facial & Glow Treatment',
-        //   category: 'Salon for Women',
-        //   description: 'VLCC/O3+ facial with deep cleansing and skin brightening',
-        //   price: 899,
-        //   duration: 60,
-        //   rating: 4.89,
-        //   reviews: 687000,
-        //   image: 'https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?w=800&h=600&fit=crop&q=80',
-        //   discount: 30,
-        // },
-        // {
-        //   id: '6',
-        //   name: 'Waxing - Full Arms & Legs',
-        //   category: 'Salon for Women',
-        //   description: 'Pain-free waxing with Rica/Honey wax at your doorstep',
-        //   price: 699,
-        //   duration: 50,
-        //   rating: 4.83,
-        //   reviews: 945000,
-        //   image: 'https://images.unsplash.com/photo-1519415510236-718bdfcd89c8?w=800&h=600&fit=crop&q=80',
-        // },
-        // {
-        //   id: '7',
-        //   name: 'Hair Spa & Treatment',
-        //   category: 'Salon for Women',
-        //   description: 'Nourishing hair spa with L\'Oreal or Matrix products',
-        //   price: 1099,
-        //   duration: 75,
-        //   rating: 4.87,
-        //   reviews: 412000,
-        //   image: 'https://images.unsplash.com/photo-1562322140-8baeececf3df?w=800&h=600&fit=crop&q=80',
-        //   popular: true,
-        // },
-        // {
-        //   id: '8',
-        //   name: 'Manicure & Pedicure',
-        //   category: 'Salon for Women',
-        //   description: 'Premium nail care with OPI polishes and French manicure',
-        //   price: 799,
-        //   duration: 60,
-        //   rating: 4.81,
-        //   reviews: 623000,
-        //   image: 'https://images.unsplash.com/photo-1604654894610-df63bc536371?w=800&h=600&fit=crop&q=80',
-        //   discount: 20,
-        // },
-        // {
-        //   id: '9',
-        //   name: 'Bridal Makeup',
-        //   category: 'Salon for Women',
-        //   description: 'Complete bridal makeup package with HD airbrush & hairstyling',
-        //   price: 8999,
-        //   duration: 180,
-        //   rating: 4.92,
-        //   reviews: 89000,
-        //   image: 'https://images.unsplash.com/photo-1487412947147-5cebf100ffc2?w=800&h=600&fit=crop&q=80',
-        // },
-        // {
-        //   id: '10',
-        //   name: 'Bathroom Deep Cleaning',
-        //   category: 'Home Cleaning',
-        //   description: 'Intensive cleaning of tiles, fixtures, and drainage with chemicals',
-        //   price: 905,
-        //   duration: 120,
-        //   rating: 4.82,
-        //   reviews: 1500000,
-        //   image: 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=800&h=600&fit=crop&q=80',
-        //   popular: true,
-        // },
-        // {
-        //   id: '11',
-        //   name: 'Kitchen Deep Cleaning',
-        //   category: 'Home Cleaning',
-        //   description: 'Thorough kitchen cleaning including chimney, counters & cabinets',
-        //   price: 1099,
-        //   duration: 150,
-        //   rating: 4.79,
-        //   reviews: 1230000,
-        //   image: 'https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=800&h=600&fit=crop&q=80',
-        //   discount: 15,
-        // },
-        // {
-        //   id: '12',
-        //   name: 'Full Home Deep Cleaning',
-        //   category: 'Home Cleaning',
-        //   description: 'Complete home sanitization with eco-friendly cleaning agents',
-        //   price: 2499,
-        //   duration: 240,
-        //   rating: 4.84,
-        //   reviews: 892000,
-        //   image: 'https://images.unsplash.com/photo-1527515637462-cff94eecc1ac?w=800&h=600&fit=crop&q=80',
-        // },
-        // {
-        //   id: '13',
-        //   name: 'Sofa & Carpet Cleaning',
-        //   category: 'Home Cleaning',
-        //   description: 'Steam cleaning for sofas, carpets, and upholstery',
-        //   price: 1299,
-        //   duration: 90,
-        //   rating: 4.77,
-        //   reviews: 567000,
-        //   image: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=800&h=600&fit=crop&q=80',
-        //   discount: 10,
-        // },
-        // {
-        //   id: '14',
-        //   name: 'Move-in/Move-out Cleaning',
-        //   category: 'Home Cleaning',
-        //   description: 'Complete house cleaning for moving in or out',
-        //   price: 3499,
-        //   duration: 300,
-        //   rating: 4.80,
-        //   reviews: 234000,
-        //   image: 'https://images.unsplash.com/photo-1628177142898-93e36e4e3a50?w=800&h=600&fit=crop&q=80',
-        // },
-        // {
-        //   id: '15',
-        //   name: 'Switch Board Repair',
-        //   category: 'Electrician',
-        //   description: 'Fix switch boards and electrical issues safely',
-        //   price: 499,
-        //   duration: 45,
-        //   rating: 4.71,
+        //   rating: 4.72,
         //   reviews: 345000,
-        //   image: 'https://images.unsplash.com/photo-1621905252507-b35492cc74b4?w=800&h=600&fit=crop&q=80',
-        // },
-        // {
-        //   id: '16',
-        //   name: 'Tap Leakage Fix',
-        //   category: 'Plumber',
-        //   description: 'Fix tap and pipe leakages with expert plumbers',
-        //   price: 399,
-        //   duration: 40,
-        //   rating: 4.68,
-        //   reviews: 456000,
-        //   image: 'https://images.unsplash.com/photo-1607472586893-edb57bdc0e39?w=800&h=600&fit=crop&q=80',
-        // },
-        // {
-        //   id: '17',
-        //   name: 'Premium Wall Painting',
-        //   category: 'Painter',
-        //   description: 'Expert painting with premium Asian Paints colors',
-        //   price: 1999,
-        //   duration: 180,
-        //   rating: 4.75,
-        //   reviews: 178000,
-        //   image: 'https://images.unsplash.com/photo-1589939705384-5185137a7f0f?w=800&h=600&fit=crop&q=80',
-        //   discount: 15,
+        //   image: 'https://images.unsplash.com/photo-1560066984-138dadb4c035?w=800&h=600&fit=crop&q=80',
+        //   popular: false,
         // },
       ];
 
@@ -392,22 +233,21 @@ export default function HomeScreen() {
 
   const handleAddNewAddress = () => {
     setShowLocationModal(false);
-    Alert.alert('Add Address', 'Navigate to Add Address screen');
+    router.push('/screens/AddressesScreen');
   };
 
   const toggleFavorite = (serviceId: string) => {
     setFavorites(prev => {
       if (prev.includes(serviceId)) {
-        Alert.alert('Removed from Favorites');
         return prev.filter(id => id !== serviceId);
       } else {
-        Alert.alert('Added to Favorites');
         return [...prev, serviceId];
       }
     });
   };
 
-  const handleServicePress = (service: Service) => {
+  // ✅ BOOK SERVICE WITH ASYNCSTORAGE
+  const handleServicePress = async (service: Service) => {
     Alert.alert(
       service.name,
       `Price: ₹${service.price}\nDuration: ${service.duration} mins\n\nWould you like to book this service?`,
@@ -415,8 +255,24 @@ export default function HomeScreen() {
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Book Now',
-          onPress: () => {
-            Alert.alert('Booking', 'Navigating to booking screen...');
+          onPress: async () => {
+            try {
+              // Store service data in AsyncStorage
+              await AsyncStorage.setItem('selectedService', JSON.stringify({
+                id: service.id,
+                name: service.name,
+                price: service.price,
+                duration: service.duration,
+                description: service.description,
+                image: service.image,
+              }));
+              
+              // Navigate to BookingModal
+              router.push('/screens/BookingModal');
+            } catch (error) {
+              console.error('Error storing service data:', error);
+              Alert.alert('Error', 'Failed to proceed with booking');
+            }
           },
         },
       ]
@@ -424,11 +280,7 @@ export default function HomeScreen() {
   };
 
   const handleRepeatBooking = () => {
-    try {
-      (router as any).push('/customer/screens/BookingsScreen');
-    } catch (error) {
-      Alert.alert('Navigation', 'Opening bookings...');
-    }
+    router.push('/screens/BookingsScreen');
   };
 
   const handleOffersPress = () => {
@@ -436,11 +288,7 @@ export default function HomeScreen() {
   };
 
   const handleMyBookingsPress = () => {
-    try {
-      (router as any).push('/customer/screens/BookingsScreen');
-    } catch (error) {
-      Alert.alert('Navigation', 'Opening bookings...');
-    }
+    router.push('/screens/BookingsScreen');
   };
 
   const handleFavoritesPress = () => {
@@ -452,11 +300,11 @@ export default function HomeScreen() {
   };
 
   const handleBannerPress = (banner: BannerImage) => {
-    Alert.alert('Offer Details', banner.title);
+    Alert.alert('Special Offer', banner.title);
   };
 
   const handleVideoPress = (video: VideoItem) => {
-    Alert.alert('Play Video', video.title);
+    Alert.alert('Video', video.title);
   };
 
   const handleSeeAllOffers = () => {
@@ -476,8 +324,7 @@ export default function HomeScreen() {
   const renderBannerItem = ({ item }: { item: BannerImage }) => (
     <TouchableOpacity
       style={styles.bannerItem}
-      activeOpacity={0.9}
-      onPress={() => handleBannerPress(item)}
+      activeOpacity={0.8}
     >
       <Image source={{ uri: item.image }} style={styles.bannerImage} resizeMode="cover" />
       <View style={styles.bannerOverlay}>
@@ -489,8 +336,7 @@ export default function HomeScreen() {
   const renderVideoItem = ({ item }: { item: VideoItem }) => (
     <TouchableOpacity
       style={styles.videoItem}
-      activeOpacity={0.9}
-      onPress={() => handleVideoPress(item)}
+      activeOpacity={0.8}
     >
       <View style={styles.videoContainer}>
         <Image source={{ uri: item.thumbnail }} style={styles.videoThumbnail} resizeMode="cover" />
@@ -532,7 +378,10 @@ export default function HomeScreen() {
           )}
           <TouchableOpacity
             style={styles.favoriteButton}
-            onPress={() => toggleFavorite(item.id)}
+            onPress={(e) => {
+              e.stopPropagation();
+              toggleFavorite(item.id);
+            }}
           >
             <Ionicons
               name={isFavorite ? 'heart' : 'heart-outline'}
@@ -575,7 +424,13 @@ export default function HomeScreen() {
             </View>
           </View>
 
-          <TouchableOpacity style={styles.bookButton} onPress={() => handleServicePress(item)}>
+          <TouchableOpacity 
+            style={styles.bookButton} 
+            onPress={(e) => {
+              e.stopPropagation();
+              handleServicePress(item);
+            }}
+          >
             <Text style={styles.bookButtonText}>Book Now</Text>
           </TouchableOpacity>
         </View>
@@ -649,17 +504,13 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* 1. POPULAR SERVICES - FIRST */}
+        {/* 1. POPULAR SERVICES */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>
               {selectedCategory ? `${selectedCategory} Services` : 'Popular Services'}
             </Text>
-            {filteredServices.length > 0 && (
-              <TouchableOpacity onPress={handleSeeAllServices}>
-                <Text style={styles.seeAllText}>See all</Text>
-              </TouchableOpacity>
-            )}
+            
           </View>
 
           <View style={styles.servicesContainer}>
@@ -675,13 +526,11 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        {/* 2. SPECIAL OFFERS - SECOND */}
+        {/* 2. SPECIAL OFFERS */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Special Offers</Text>
-            <TouchableOpacity onPress={handleSeeAllOffers}>
-              <Text style={styles.seeAllText}>See all</Text>
-            </TouchableOpacity>
+            
           </View>
           <FlatList
             data={bannerImages}
@@ -696,13 +545,11 @@ export default function HomeScreen() {
           />
         </View>
 
-        {/* 3. HOW WE WORK - THIRD */}
+        {/* 3. HOW WE WORK */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>How We Work</Text>
-            <TouchableOpacity onPress={handleSeeAllVideos}>
-              <Text style={styles.seeAllText}>See all</Text>
-            </TouchableOpacity>
+            
           </View>
           <FlatList
             data={videos}
@@ -771,8 +618,6 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingBottom: 24,
   },
-
-  // Header
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -843,8 +688,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#fff',
   },
-
-  // Search
   searchSection: {
     paddingHorizontal: 20,
     paddingVertical: 12,
@@ -867,8 +710,6 @@ const styles = StyleSheet.create({
     color: '#333',
     padding: 0,
   },
-
-  // Quick Actions
   quickActionsBar: {
     flexDirection: 'row',
     paddingHorizontal: 20,
@@ -896,8 +737,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#333',
   },
-
-  // Section
   section: {
     marginTop: 24,
   },
@@ -918,8 +757,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#6C3FE4',
   },
-
-  // Banner Slider
   bannerListContainer: {
     paddingLeft: 20,
     paddingRight: 20,
@@ -948,8 +785,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#fff',
   },
-
-  // Video Slider
   videoListContainer: {
     paddingLeft: 20,
     paddingRight: 20,
@@ -997,8 +832,6 @@ const styles = StyleSheet.create({
     marginTop: 8,
     lineHeight: 18,
   },
-
-  // Services
   servicesContainer: {
     paddingHorizontal: 20,
   },
@@ -1147,8 +980,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#fff',
   },
-
-  // Empty State
   emptyState: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -1165,8 +996,6 @@ const styles = StyleSheet.create({
     color: '#999',
     marginTop: 4,
   },
-
-  // Location Modal
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',

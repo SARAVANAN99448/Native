@@ -5,12 +5,12 @@
     "extra": {
       "clientId": "1080097552471-hp3dg4afltchb258pmmgofh36jgmct3t.apps.googleusercontent.com",
       "iosClientId": "YOUR_IOS_CLIENT_ID.apps.googleusercontent.com",
-      "androidClientId": "293613594811-pcv35nh7tnkbafap0hbpqo3vvuka1l9b.apps.googleusercontent.com",
-      "webClientId": "1080097552471-i1nkgpog78cvhgqdiuqqskmhrt3d1gpj.apps.googleusercontent.com",
-      "googleClientId": "279706137005-b5scnahpcebpg2eneqvurl4r0gfk98r3.apps.googleusercontent.com",
+      "androidClientId": "30958469031-is2prbkuq1ijmchktfee22mq6856e01v.apps.googleusercontent.com",
+      "webClientId": "30958469031-is2prbkuq1ijmchktfee22mq6856e01v.apps.googleusercontent.com",
+      "googleClientId": "30958469031-is2prbkuq1ijmchktfee22mq6856e01v.apps.googleusercontent.com",
       "router": {},
       "eas": {
-        "projectId": "08a066f6-08cd-4a1a-8ec4-49eb330f71c5"
+        "projectId": "3dcb5aac-bdcc-4412-91ec-b137232f888e"
       }
     },
     "version": "1.0.0",
@@ -23,8 +23,7 @@
       "supportsTablet": true
     },
     "android": {
-      "package": "app.vernure.frontend",
-      "package": "app.vernure.vint",
+      "package": "app.vint.app",
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
@@ -52,14 +51,18 @@
     },
     "plugins": [
       "expo-router",
+      "expo-build-properties",
       "@react-native-firebase/app",
       "@react-native-firebase/auth",
       "@react-native-firebase/crashlytics",
       "@react-native-google-signin/google-signin",
+      
       [
         "expo-splash-screen",
+        
+        
         {
-          "image": "./assets/images/splash-icon.png",
+          "image": "./assets/images/splash-image.png",
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#ffffff",
@@ -68,7 +71,8 @@
           }
         }
       ],
-      "expo-web-browser"
+      "expo-web-browser",
+      "expo-build-properties"
     ],
     "experiments": {
       "typedRoutes": true,

@@ -20,6 +20,14 @@ import { Alert, Platform } from "react-native";
 
 WebBrowser.maybeCompleteAuthSession();
 
+// Extend Window type for web
+declare global {
+  interface Window {
+    recaptchaVerifier?: RecaptchaVerifier;
+    confirmationResult?: any;
+  }
+}
+
 const AuthContext = createContext<any>(null);
 
 export const AuthProvider = ({ children }: any) => {
@@ -27,18 +35,19 @@ export const AuthProvider = ({ children }: any) => {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [verificationId, setVerificationId] = useState<string>("");
+  
+  // ✅ CREATE recaptchaVerifier ref for mobile
+  const recaptchaVerifier = useRef<any>(null);
 
-  // ✅ Google Auth setup
-//   const [request, response, promptAsync] = Google.useAuthRequest({
-//   clientId: "",
-// });
-
+  // ✅ Google Auth setup - Replace with your actual client ID
+  const [request, response, promptAsync] = Google.useAuthRequest({
+    clientId: "30958469031-is2prbkuq1ijmchktfee22mq6856e01v.apps.googleusercontent.com",
+  });
 
   // ✅ Listen for Auth state changes
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
-        // Check if user exists in Firestore
         const customerRef = doc(db, "customers", firebaseUser.uid);
         const techRef = doc(db, "technicians", firebaseUser.uid);
 
@@ -52,7 +61,6 @@ export const AuthProvider = ({ children }: any) => {
           setUser({ uid: firebaseUser.uid, role: "technician", ...techSnap.data() });
           router.replace("/technician");
         } else {
-          // If new Google user, create default "customer" entry
           await setDoc(doc(db, "customers", firebaseUser.uid), {
             name: firebaseUser.displayName || "",
             email: firebaseUser.email || "",
@@ -104,47 +112,105 @@ export const AuthProvider = ({ children }: any) => {
     }
   };
 
-  // SEND OTP
+  // ✅ SEND OTP - UNIVERSAL (Web + Mobile)
   const sendOTP = async (phoneNumber: string) => {
-    if (!phoneNumber.startsWith("+")) throw new Error("Use international format +91XXXXXXXXXX");
+    if (!phoneNumber.startsWith("+")) {
+      throw new Error("Use international format +91XXXXXXXXXX");
+    }
 
-    if (Platform.OS === "web") {
-      // Web
-      if (!window.recaptchaVerifier) {
-        window.recaptchaVerifier = new RecaptchaVerifier(
-          auth,
-          "recaptcha-container",
-          { size: "invisible", callback: () => console.log("reCAPTCHA solved") }
+    try {
+      if (Platform.OS === "web") {
+        // ✅ WEB: Use RecaptchaVerifier
+        if (!window.recaptchaVerifier) {
+          window.recaptchaVerifier = new RecaptchaVerifier(
+            auth,
+            "recaptcha-container",
+            { 
+              size: "invisible", 
+              callback: () => console.log("✅ reCAPTCHA solved"),
+              "expired-callback": () => console.log("❌ reCAPTCHA expired")
+            }
+          );
+        }
+        const confirmation = await signInWithPhoneNumber(
+          auth, 
+          phoneNumber, 
+          window.recaptchaVerifier
         );
-        await window.recaptchaVerifier.render();
+        window.confirmationResult = confirmation;
+        console.log("✅ OTP sent (web)");
+      } else {
+        // ✅ MOBILE: Use PhoneAuthProvider with FirebaseRecaptchaVerifierModal
+        if (!recaptchaVerifier.current) {
+          throw new Error("reCAPTCHA verifier not initialized");
+        }
+        const phoneProvider = new PhoneAuthProvider(auth);
+        const verId = await phoneProvider.verifyPhoneNumber(
+          phoneNumber,
+          recaptchaVerifier.current
+        );
+        setVerificationId(verId);
+        console.log("✅ OTP sent (mobile)", verId);
       }
-      const confirmation = await signInWithPhoneNumber(auth, phoneNumber, window.recaptchaVerifier);
-      window.confirmationResult = confirmation;
-      console.log("✅ OTP sent (web)", confirmation);
-    } else {
-      // Mobile
-      if (!recaptchaVerifier.current) throw new Error("reCAPTCHA not ready");
-      const phoneProvider = new PhoneAuthProvider(auth);
-      const verId = await phoneProvider.verifyPhoneNumber(phoneNumber, recaptchaVerifier.current);
-      setVerificationId(verId);
-      console.log("✅ OTP sent (mobile)", verId);
+    } catch (error: any) {
+      console.error("❌ Error sending OTP:", error);
+      throw error;
     }
   };
 
-  // VERIFY OTP
+  // ✅ VERIFY OTP - UNIVERSAL
   const verifyOTP = async (otp: string) => {
-    if (Platform.OS === "web") {
-      if (!window.confirmationResult) throw new Error("Send OTP first");
-      const result = await window.confirmationResult.confirm(otp);
-      console.log("✅ Verified (web)", result.user);
-      return result.user;
-    } else {
-      if (!verificationId) throw new Error("Send OTP first");
-      const cred = PhoneAuthProvider.credential(verificationId, otp);
-      const result = await signInWithPhoneCredential(auth, cred);
-      setVerificationId("");
-      console.log("✅ Verified (mobile)", result.user);
-      return result.user;
+    try {
+      if (Platform.OS === "web") {
+        // ✅ WEB
+        if (!window.confirmationResult) {
+          throw new Error("Please request OTP first");
+        }
+        const result = await window.confirmationResult.confirm(otp);
+        console.log("✅ Verified (web)", result.user.uid);
+        
+        const customerRef = doc(db, "customers", result.user.uid);
+        const customerSnap = await getDoc(customerRef);
+        
+        if (!customerSnap.exists()) {
+          await setDoc(customerRef, {
+            name: result.user.displayName || "",
+            email: result.user.email || "",
+            phone: result.user.phoneNumber || "",
+            role: "customer",
+            createdAt: new Date().toISOString(),
+          });
+        }
+        
+        return result.user;
+      } else {
+        // ✅ MOBILE
+        if (!verificationId) {
+          throw new Error("Please request OTP first");
+        }
+        const cred = PhoneAuthProvider.credential(verificationId, otp);
+        const result = await signInWithPhoneCredential(auth, cred);
+        setVerificationId("");
+        console.log("✅ Verified (mobile)", result.user.uid);
+        
+        const customerRef = doc(db, "customers", result.user.uid);
+        const customerSnap = await getDoc(customerRef);
+        
+        if (!customerSnap.exists()) {
+          await setDoc(customerRef, {
+            name: result.user.displayName || "",
+            email: result.user.email || "",
+            phone: result.user.phoneNumber || "",
+            role: "customer",
+            createdAt: new Date().toISOString(),
+          });
+        }
+        
+        return result.user;
+      }
+    } catch (error: any) {
+      console.error("❌ Error verifying OTP:", error);
+      throw error;
     }
   };
 
@@ -152,7 +218,13 @@ export const AuthProvider = ({ children }: any) => {
     await signOut(auth);
     setUser(null);
     setVerificationId("");
-    if (Platform.OS === "web" && window.recaptchaVerifier) window.recaptchaVerifier.clear();
+    
+    if (Platform.OS === "web" && window.recaptchaVerifier) {
+      window.recaptchaVerifier.clear();
+      window.recaptchaVerifier = undefined;
+      window.confirmationResult = undefined;
+    }
+    
     router.replace("/auth");
   };
 
@@ -167,7 +239,7 @@ export const AuthProvider = ({ children }: any) => {
         logout,
         sendOTP,
         verifyOTP,
-        recaptchaVerifier,
+        recaptchaVerifier, // ✅ Pass the ref
         app,
       }}
     >
@@ -176,4 +248,10 @@ export const AuthProvider = ({ children }: any) => {
   );
 };
 
-export const useAuth = () => useContext(AuthContext);
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error("useAuth must be used within AuthProvider");
+  }
+  return context;
+};
