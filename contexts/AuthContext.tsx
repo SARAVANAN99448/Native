@@ -35,16 +35,16 @@ export const AuthProvider = ({ children }: any) => {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [verificationId, setVerificationId] = useState<string>("");
-  
-  // ✅ CREATE recaptchaVerifier ref for mobile
+
   const recaptchaVerifier = useRef<any>(null);
 
-  // ✅ Google Auth setup - Replace with your actual client ID
+  // Google Auth setup
   const [request, response, promptAsync] = Google.useAuthRequest({
-    clientId: "30958469031-is2prbkuq1ijmchktfee22mq6856e01v.apps.googleusercontent.com",
+    androidClientId: "1051125804819-5m993sk85bdcep4vrppenficu868f72s.apps.googleusercontent.com",
+    webClientId: "1051125804819-jgiuubo27g6rrr4ph8vd32f2fujn3i10.apps.googleusercontent.com",
   });
 
-  // ✅ Listen for Auth state changes
+  // Listen for Auth state changes
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
@@ -55,12 +55,15 @@ export const AuthProvider = ({ children }: any) => {
         const techSnap = await getDoc(techRef);
 
         if (customerSnap.exists()) {
-          setUser({ uid: firebaseUser.uid, role: "customer", ...customerSnap.data() });
+          const userData = { uid: firebaseUser.uid, role: "customer", ...customerSnap.data() };
+          setUser(userData);
           router.replace("/customer");
         } else if (techSnap.exists()) {
-          setUser({ uid: firebaseUser.uid, role: "technician", ...techSnap.data() });
+          const userData = { uid: firebaseUser.uid, role: "technician", ...techSnap.data() };
+          setUser(userData);
           router.replace("/technician");
         } else {
+          // Create default customer account if no data exists
           await setDoc(doc(db, "customers", firebaseUser.uid), {
             name: firebaseUser.displayName || "",
             email: firebaseUser.email || "",
@@ -68,7 +71,8 @@ export const AuthProvider = ({ children }: any) => {
             role: "customer",
             createdAt: new Date().toISOString(),
           });
-          setUser({ uid: firebaseUser.uid, role: "customer" });
+          const userData = { uid: firebaseUser.uid, role: "customer" };
+          setUser(userData);
           router.replace("/customer");
         }
       } else {
@@ -93,8 +97,28 @@ export const AuthProvider = ({ children }: any) => {
     });
   };
 
+  // ✅ UPDATED: Return user data with role
   const login = async (email: string, password: string) => {
-    await signInWithEmailAndPassword(auth, email, password);
+    const userCredential = await signInWithEmailAndPassword(auth, email, password);
+    const uid = userCredential.user.uid;
+
+    // Check in customers collection first
+    const customerDoc = await getDoc(doc(db, 'customers', uid));
+    if (customerDoc.exists()) {
+      const userData = { uid, ...customerDoc.data(), role: 'customer' };
+      setUser(userData);
+      return userData;
+    }
+
+    // Check in technicians collection
+    const techDoc = await getDoc(doc(db, 'technicians', uid));
+    if (techDoc.exists()) {
+      const userData = { uid, ...techDoc.data(), role: 'technician' };
+      setUser(userData);
+      return userData;
+    }
+
+    throw new Error('User data not found in database');
   };
 
   const googleLogin = async () => {
@@ -112,7 +136,7 @@ export const AuthProvider = ({ children }: any) => {
     }
   };
 
-  // ✅ SEND OTP - UNIVERSAL (Web + Mobile)
+  // SEND OTP - UNIVERSAL (Web + Mobile)
   const sendOTP = async (phoneNumber: string) => {
     if (!phoneNumber.startsWith("+")) {
       throw new Error("Use international format +91XXXXXXXXXX");
@@ -120,27 +144,25 @@ export const AuthProvider = ({ children }: any) => {
 
     try {
       if (Platform.OS === "web") {
-        // ✅ WEB: Use RecaptchaVerifier
         if (!window.recaptchaVerifier) {
           window.recaptchaVerifier = new RecaptchaVerifier(
             auth,
             "recaptcha-container",
-            { 
-              size: "invisible", 
+            {
+              size: "invisible",
               callback: () => console.log("✅ reCAPTCHA solved"),
               "expired-callback": () => console.log("❌ reCAPTCHA expired")
             }
           );
         }
         const confirmation = await signInWithPhoneNumber(
-          auth, 
-          phoneNumber, 
+          auth,
+          phoneNumber,
           window.recaptchaVerifier
         );
         window.confirmationResult = confirmation;
         console.log("✅ OTP sent (web)");
       } else {
-        // ✅ MOBILE: Use PhoneAuthProvider with FirebaseRecaptchaVerifierModal
         if (!recaptchaVerifier.current) {
           throw new Error("reCAPTCHA verifier not initialized");
         }
@@ -158,55 +180,56 @@ export const AuthProvider = ({ children }: any) => {
     }
   };
 
-  // ✅ VERIFY OTP - UNIVERSAL
+  // ✅ UPDATED: Return user data with role
   const verifyOTP = async (otp: string) => {
     try {
+      let result;
+
       if (Platform.OS === "web") {
-        // ✅ WEB
         if (!window.confirmationResult) {
           throw new Error("Please request OTP first");
         }
-        const result = await window.confirmationResult.confirm(otp);
+        result = await window.confirmationResult.confirm(otp);
         console.log("✅ Verified (web)", result.user.uid);
-        
-        const customerRef = doc(db, "customers", result.user.uid);
-        const customerSnap = await getDoc(customerRef);
-        
-        if (!customerSnap.exists()) {
-          await setDoc(customerRef, {
-            name: result.user.displayName || "",
-            email: result.user.email || "",
-            phone: result.user.phoneNumber || "",
-            role: "customer",
-            createdAt: new Date().toISOString(),
-          });
-        }
-        
-        return result.user;
       } else {
-        // ✅ MOBILE
         if (!verificationId) {
           throw new Error("Please request OTP first");
         }
         const cred = PhoneAuthProvider.credential(verificationId, otp);
-        const result = await signInWithPhoneCredential(auth, cred);
+        result = await signInWithPhoneCredential(auth, cred);
         setVerificationId("");
         console.log("✅ Verified (mobile)", result.user.uid);
-        
-        const customerRef = doc(db, "customers", result.user.uid);
-        const customerSnap = await getDoc(customerRef);
-        
-        if (!customerSnap.exists()) {
-          await setDoc(customerRef, {
-            name: result.user.displayName || "",
-            email: result.user.email || "",
-            phone: result.user.phoneNumber || "",
-            role: "customer",
-            createdAt: new Date().toISOString(),
-          });
-        }
-        
-        return result.user;
+      }
+
+      const uid = result.user.uid;
+
+      // Check existing user role
+      const customerRef = doc(db, "customers", uid);
+      const techRef = doc(db, "technicians", uid);
+
+      const customerSnap = await getDoc(customerRef);
+      const techSnap = await getDoc(techRef);
+
+      if (customerSnap.exists()) {
+        const userData = { uid, ...customerSnap.data(), role: 'customer' };
+        setUser(userData);
+        return userData;
+      } else if (techSnap.exists()) {
+        const userData = { uid, ...techSnap.data(), role: 'technician' };
+        setUser(userData);
+        return userData;
+      } else {
+        // Create new customer account if doesn't exist
+        await setDoc(customerRef, {
+          name: result.user.displayName || "",
+          email: result.user.email || "",
+          phone: result.user.phoneNumber || "",
+          role: "customer",
+          createdAt: new Date().toISOString(),
+        });
+        const userData = { uid, role: "customer" };
+        setUser(userData);
+        return userData;
       }
     } catch (error: any) {
       console.error("❌ Error verifying OTP:", error);
@@ -218,13 +241,13 @@ export const AuthProvider = ({ children }: any) => {
     await signOut(auth);
     setUser(null);
     setVerificationId("");
-    
+
     if (Platform.OS === "web" && window.recaptchaVerifier) {
       window.recaptchaVerifier.clear();
       window.recaptchaVerifier = undefined;
       window.confirmationResult = undefined;
     }
-    
+
     router.replace("/auth");
   };
 
@@ -239,7 +262,7 @@ export const AuthProvider = ({ children }: any) => {
         logout,
         sendOTP,
         verifyOTP,
-        recaptchaVerifier, // ✅ Pass the ref
+        recaptchaVerifier,
         app,
       }}
     >

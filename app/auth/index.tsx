@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import {
   View,
   Text,
@@ -14,92 +14,149 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { useRouter } from "expo-router";
-import { useAuth } from "../../contexts/AuthContext"; 
-import auth from '@react-native-firebase/auth';
+import { useAuth } from "../../contexts/AuthContext";
+import { FirebaseRecaptchaVerifierModal } from "expo-firebase-recaptcha";
+import { app } from "../../config/firebaseConfig";
+
+type UserRole = "customer" | "technician";
+
+interface FormData {
+  name: string;
+  email: string;
+  password: string;
+  phone: string;
+  role: UserRole;
+}
 
 export default function AuthScreen() {
   const [isLogin, setIsLogin] = useState(true);
   const [authMethod, setAuthMethod] = useState<"email" | "phone">("email");
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<FormData>({
     name: "",
     email: "",
     password: "",
     phone: "+91",
-    role: "customer" as "customer" | "technician",
+    role: "customer",
   });
   const [otpSent, setOtpSent] = useState(false);
   const [otp, setOtp] = useState("");
   const [loading, setLoading] = useState(false);
-  const [verificationId, setVerificationId] = useState<string | null>(null);
 
   const router = useRouter();
-  const { login, register, googleLogin } = useAuth(); // adjust if needed
+  const { login, register, googleLogin, sendOTP, verifyOTP } = useAuth();
+  const recaptchaVerifier = useRef(null);
 
-  // EMAIL AUTH
-  const handleEmailAuth = async () => {
-    if (isLogin) {
-      if (!formData.email || !formData.password) return Alert.alert("Error", "Enter email & password");
-      try {
-        setLoading(true);
-        await login(formData.email, formData.password);
-        router.replace("/");
-      } catch (e: any) {
-        Alert.alert("Login Error", e.message);
-      } finally {
-        setLoading(false);
+  // Role selector component
+  const RoleSelector = () => (
+    <View style={styles.roleSelectorContainer}>
+      {["customer", "technician"].map((roleOption) => (
+        <TouchableOpacity
+          key={roleOption}
+          style={[
+            styles.roleButton,
+            formData.role === roleOption && styles.roleButtonActive,
+          ]}
+          disabled={loading}
+          onPress={() => setFormData({ ...formData, role: roleOption as UserRole })}
+        >
+          <Text
+            style={[
+              styles.roleButtonText,
+              formData.role === roleOption && styles.roleButtonTextActive,
+            ]}
+          >
+            {roleOption.charAt(0).toUpperCase() + roleOption.slice(1)}
+          </Text>
+        </TouchableOpacity>
+      ))}
+    </View>
+  );
+
+const handleEmailAuth = async () => {
+  if (isLogin) {
+    if (!formData.email || !formData.password)
+      return Alert.alert("Error", "Enter email & password");
+    try {
+      setLoading(true);
+      const userData = await login(formData.email, formData.password);
+      
+      // Navigate based on ACTUAL user role from database, not UI selection
+      if (userData.role === "technician") {
+        router.replace("/technician");
+      } else if (userData.role === "customer") {
+        router.replace("/customer");
+      } else {
+        Alert.alert("Error", "Invalid user role");
       }
-    } else {
-      if (!formData.name || !formData.email || !formData.password)
-        return Alert.alert("Error", "Fill all fields");
-      if (formData.password.length < 6)
-        return Alert.alert("Weak Password", "Password must be at least 6 characters");
-      try {
-        setLoading(true);
-        await register(formData);
-        Alert.alert("Success", "Account created! Please sign in.");
-        setIsLogin(true);
-      } catch (e: any) {
-        Alert.alert("Registration Error", e.message || "Failed to register");
-      } finally {
-        setLoading(false);
-      }
+    } catch (e: any) {
+      Alert.alert("Login Error", e.message);
+    } finally {
+      setLoading(false);
     }
-  };
-
-  // PHONE AUTH
-  const handlePhoneAuth = async () => {
-    if (!formData.phone || !/^\+91\d{10}$/.test(formData.phone))
-      return Alert.alert("Invalid Phone", "Use +91XXXXXXXXXX format");
-
-    if (!otpSent) {
-      try {
-        setLoading(true);
-        const confirmation = await auth().signInWithPhoneNumber(formData.phone);
-        setVerificationId(confirmation.verificationId);
-        setOtpSent(true);
-        Alert.alert("OTP Sent", "Check your phone for the verification code.");
-      } catch (error: any) {
-        Alert.alert("Error", error.message || "Failed to send OTP");
-      } finally {
-        setLoading(false);
-      }
-    } else {
-      if (!otp || otp.length !== 6) return Alert.alert("Invalid OTP", "Enter 6-digit OTP");
-      try {
-        setLoading(true);
-        if (verificationId) {
-          const credential = auth.PhoneAuthProvider.credential(verificationId, otp);
-          await auth().signInWithCredential(credential);
-          Alert.alert("Success", "Phone verified successfully!");
-          router.replace("/");
-        }
-      } catch (error: any) {
-        Alert.alert("Verification Failed", error.message || "Invalid OTP");
-      } finally {
-        setLoading(false);
-      }
+  } else {
+    // Registration flow stays the same
+    if (!formData.name || !formData.email || !formData.password)
+      return Alert.alert("Error", "Fill all fields");
+    if (formData.password.length < 6)
+      return Alert.alert(
+        "Weak Password",
+        "Password must be at least 6 characters"
+      );
+    try {
+      setLoading(true);
+      await register(formData);
+      Alert.alert("Success", "Account created! Please sign in.");
+      setIsLogin(true);
+    } catch (e: any) {
+      Alert.alert("Registration Error", e.message || "Failed to register");
+    } finally {
+      setLoading(false);
     }
-  };
+  }
+};
+
+const handlePhoneAuth = async () => {
+  if (!formData.phone || !/^\+91\d{10}$/.test(formData.phone))
+    return Alert.alert("Invalid Phone", "Use +91XXXXXXXXXX format");
+
+  if (!otpSent) {
+    try {
+      setLoading(true);
+      await sendOTP(
+        formData.phone,
+        Platform.OS === "web" ? undefined : recaptchaVerifier.current
+      );
+      setOtpSent(true);
+      Alert.alert("OTP Sent", "Check your phone for the verification code.");
+    } catch (error: any) {
+      Alert.alert("Error", error.message || "Failed to send OTP");
+    } finally {
+      setLoading(false);
+    }
+  } else {
+    if (!otp || otp.length !== 6)
+      return Alert.alert("Invalid OTP", "Enter 6-digit OTP");
+    try {
+      setLoading(true);
+      const userData = await verifyOTP(otp);
+      Alert.alert("Success", "Phone verified successfully!");
+      
+      // Navigate based on ACTUAL user role from database
+      if (userData.role === "technician") {
+        router.replace("/technician");
+      } else if (userData.role === "customer") {
+        router.replace("/customer");
+      } else {
+        Alert.alert("Error", "Invalid user role");
+      }
+    } catch (error: any) {
+      Alert.alert("Verification Failed", error.message || "Invalid OTP");
+    } finally {
+      setLoading(false);
+    }
+  }
+};
+
 
   const handleSubmit = async () => {
     if (authMethod === "email") await handleEmailAuth();
@@ -118,8 +175,18 @@ export default function AuthScreen() {
         style={styles.container}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
-        <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
-          {/* Header */}
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+        >
+          {Platform.OS !== "web" && (
+            <FirebaseRecaptchaVerifierModal
+              ref={recaptchaVerifier}
+              firebaseConfig={app.options}
+              attemptInvisibleVerification
+            />
+          )}
+
           <View style={styles.header}>
             <Image
               style={styles.logo}
@@ -132,7 +199,8 @@ export default function AuthScreen() {
             </Text>
           </View>
 
-          {/* Tabs */}
+          {!otpSent && <RoleSelector />}
+
           {!otpSent && (
             <View style={styles.tabContainer}>
               <TouchableOpacity
@@ -140,19 +208,26 @@ export default function AuthScreen() {
                 onPress={() => setAuthMethod("email")}
                 disabled={loading}
               >
-                <Text style={[styles.tabText, authMethod === "email" && styles.tabTextActive]}>Email</Text>
+                <Text
+                  style={[styles.tabText, authMethod === "email" && styles.tabTextActive]}
+                >
+                  Email
+                </Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.tab, authMethod === "phone" && styles.tabActive]}
                 onPress={() => setAuthMethod("phone")}
                 disabled={loading}
               >
-                <Text style={[styles.tabText, authMethod === "phone" && styles.tabTextActive]}>Phone</Text>
+                <Text
+                  style={[styles.tabText, authMethod === "phone" && styles.tabTextActive]}
+                >
+                  Phone
+                </Text>
               </TouchableOpacity>
             </View>
           )}
 
-          {/* Form */}
           <View style={styles.form}>
             {authMethod === "email" ? (
               <>
@@ -226,22 +301,26 @@ export default function AuthScreen() {
               </>
             )}
 
-            {/* Submit */}
             <TouchableOpacity
               style={[styles.submitButton, loading && styles.submitButtonDisabled]}
               onPress={handleSubmit}
               disabled={loading}
             >
-              {loading ? <ActivityIndicator color="#fff" /> : (
+              {loading ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
                 <Text style={styles.submitButtonText}>
-                  {authMethod === "phone" && otpSent ? "Verify OTP" :
-                    authMethod === "phone" ? "Send OTP" :
-                      isLogin ? "Sign In" : "Sign Up"}
+                  {authMethod === "phone" && otpSent
+                    ? "Verify OTP"
+                    : authMethod === "phone"
+                    ? "Send OTP"
+                    : isLogin
+                    ? "Sign In"
+                    : "Sign Up"}
                 </Text>
               )}
             </TouchableOpacity>
 
-            {/* Google Sign-in */}
             {!otpSent && authMethod === "email" && (
               <TouchableOpacity
                 style={[styles.submitButton, styles.googleButton]}
@@ -252,11 +331,13 @@ export default function AuthScreen() {
               </TouchableOpacity>
             )}
 
-            {/* Switch */}
             {otpSent ? (
               <TouchableOpacity
                 style={styles.switchButton}
-                onPress={() => { setOtpSent(false); setOtp(""); setVerificationId(null); }}
+                onPress={() => {
+                  setOtpSent(false);
+                  setOtp("");
+                }}
                 disabled={loading}
               >
                 <Text style={styles.switchButtonText}>← Back to Phone Number</Text>
@@ -264,11 +345,16 @@ export default function AuthScreen() {
             ) : (
               <TouchableOpacity
                 style={styles.switchButton}
-                onPress={() => { setIsLogin(!isLogin); setAuthMethod("email"); }}
+                onPress={() => {
+                  setIsLogin(!isLogin);
+                  setAuthMethod("email");
+                }}
                 disabled={loading}
               >
                 <Text style={styles.switchButtonText}>
-                  {isLogin ? "Don't have an account? Sign Up" : "Already have an account? Sign In"}
+                  {isLogin
+                    ? "Don't have an account? Sign Up"
+                    : "Already have an account? Sign In"}
                 </Text>
               </TouchableOpacity>
             )}
@@ -286,6 +372,30 @@ const styles = StyleSheet.create({
   logo: { width: 100, height: 100 },
   title: { fontSize: 32, fontWeight: "bold", color: "#333", marginTop: 16 },
   subtitle: { fontSize: 16, color: "#666", marginTop: 8 },
+  roleSelectorContainer: {
+    flexDirection: "row",
+    justifyContent: "center",
+    marginVertical: 20,
+  },
+  roleButton: {
+    borderWidth: 1,
+    borderColor: "#007AFF",
+    borderRadius: 25,
+    paddingVertical: 10,
+    paddingHorizontal: 25,
+    marginHorizontal: 5,
+  },
+  roleButtonActive: {
+    backgroundColor: "#007AFF",
+  },
+  roleButtonText: {
+    color: "#007AFF",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  roleButtonTextActive: {
+    color: "#fff",
+  },
   tabContainer: {
     flexDirection: "row",
     marginHorizontal: 24,

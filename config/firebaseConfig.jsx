@@ -1,12 +1,16 @@
-// Import the functions you need from the SDKs you need
 import { initializeApp } from "firebase/app";
-import { getAuth, RecaptchaVerifier, signInWithPhoneNumber } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
-// TODO: Add SDKs for Firebase products that you want to use
-// https://firebase.google.com/docs/web/setup#available-libraries
 
-// Your web app's Firebase configuration
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+import {
+  initializeAuth,
+  getReactNativePersistence,
+  RecaptchaVerifier,
+  signInWithPhoneNumber,
+} from "firebase/auth";
+
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+// Your Firebase config
 const firebaseConfig = {
   apiKey: "AIzaSyB1ZV8B4WHhwdRCiQJfxeV53P38Z0WJuMU",
   authDomain: "vint-app-da1fa.firebaseapp.com",
@@ -17,9 +21,16 @@ const firebaseConfig = {
   measurementId: "G-YSQ28Z50E8"
 };
 
-// Initialize Firebase
+// Initialize Firebase app
 export const app = initializeApp(firebaseConfig);
-export const auth = getAuth(app);
+
+// Initialize Firestore
 export const db = getFirestore(app);
 
-export { RecaptchaVerifier, signInWithPhoneNumber }
+// Initialize Firebase Auth with React Native AsyncStorage persistence
+export const auth = initializeAuth(app, {
+  persistence: getReactNativePersistence(AsyncStorage),
+});
+
+// Export RecaptchaVerifier and signInWithPhoneNumber for phone auth usage
+export { RecaptchaVerifier, signInWithPhoneNumber };

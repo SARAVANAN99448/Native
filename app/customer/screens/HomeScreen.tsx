@@ -15,7 +15,7 @@ import {
   Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth } from '../../../contexts/AuthContext';
 import { router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -233,7 +233,7 @@ export default function HomeScreen() {
 
   const handleAddNewAddress = () => {
     setShowLocationModal(false);
-    router.push('/screens/AddressesScreen');
+    router.push('/customer/screens/AddressesScreen');
   };
 
   const toggleFavorite = (serviceId: string) => {
@@ -268,7 +268,7 @@ export default function HomeScreen() {
               }));
               
               // Navigate to BookingModal
-              router.push('/screens/BookingModal');
+              router.push('/customer/screens/BookingModal');
             } catch (error) {
               console.error('Error storing service data:', error);
               Alert.alert('Error', 'Failed to proceed with booking');
@@ -280,7 +280,7 @@ export default function HomeScreen() {
   };
 
   const handleRepeatBooking = () => {
-    router.push('/screens/BookingsScreen');
+    router.push('/customer/screens/BookingsScreen');
   };
 
   const handleOffersPress = () => {
@@ -288,7 +288,7 @@ export default function HomeScreen() {
   };
 
   const handleMyBookingsPress = () => {
-    router.push('/screens/BookingsScreen');
+    router.push('/customer/screens/BookingsScreen');
   };
 
   const handleFavoritesPress = () => {

@@ -1,4 +1,4 @@
-// Type definitions for Urban Company Clone
+// Type definitions for vint Company Clone
 
 export interface User {
   id: string;

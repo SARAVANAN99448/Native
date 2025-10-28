@@ -16,9 +16,9 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth } from '../../../contexts/AuthContext';
 import { signOut } from 'firebase/auth';
-import { auth } from '../../config/firebaseConfig';
+import { auth } from '../../../config/firebaseConfig';
 import { useRouter } from 'expo-router';
 import { ComponentProps } from 'react';
 
@@ -206,12 +206,12 @@ export default function ProfileScreen() {
 
   // ✅ Navigate to Address Management Screen
   const handleManageAddresses = () => {
-    router.push('/screens/AddressesScreen');
+    router.push('/customer/screens/AddressesScreen');
   };
 
   // ✅ Navigate to Payment Methods Screen
   const handlePaymentMethods = () => {
-    router.push('/screens/PaymentMethodsScreen');
+    router.push('/customer/screens/PaymentMethodsScreen');
   };
 
   const handleNotificationSettings = () => {
@@ -219,7 +219,7 @@ export default function ProfileScreen() {
   };
 
   const handleWallet = () => {
-    router.push('/screens/WalletScreen');
+    router.push('/customer/screens/WalletScreen');
   };
 
   const handleRewards = () => {

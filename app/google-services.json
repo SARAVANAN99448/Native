@@ -1,41 +1,33 @@
 {
   "project_info": {
-    "project_number": "30958469031",
-    "project_id": "vint-app-f2cec",
-    "storage_bucket": "vint-app-f2cec.firebasestorage.app"
+    "project_number": "656074835735",
+    "project_id": "vint-app-da1fa",
+    "storage_bucket": "vint-app-da1fa.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:30958469031:android:2f5c5a57f45139d6ed8082",
+        "mobilesdk_app_id": "1:656074835735:android:2a872b6ef24e88b7ee9952",
         "android_client_info": {
           "package_name": "app.vint.app"
         }
       },
       "oauth_client": [
         {
-          "client_id": "30958469031-ltekmfqkshjo8a2scc0gcg7bvnrhgnu3.apps.googleusercontent.com",
-          "client_type": 1,
-          "android_info": {
-            "package_name": "app.vint.app",
-            "certificate_hash": "066be725e52f6105b19b7b3889078baab4333094"
-          }
-        },
-        {
-          "client_id": "30958469031-is2prbkuq1ijmchktfee22mq6856e01v.apps.googleusercontent.com",
+          "client_id": "656074835735-2i31r5c89b7i4cer5hcoqcl9h45mj306.apps.googleusercontent.com",
           "client_type": 3
         }
       ],
       "api_key": [
         {
-          "current_key": "AIzaSyCnxCgrXxhtpdCMfqNwH_5iARTVahYYAnA"
+          "current_key": "AIzaSyChAe_Ocf_wEf2an6dsJib_rGFgOmFZxso"
         }
       ],
       "services": {
         "appinvite_service": {
           "other_platform_oauth_client": [
             {
-              "client_id": "30958469031-is2prbkuq1ijmchktfee22mq6856e01v.apps.googleusercontent.com",
+              "client_id": "656074835735-2i31r5c89b7i4cer5hcoqcl9h45mj306.apps.googleusercontent.com",
               "client_type": 3
             }
           ]

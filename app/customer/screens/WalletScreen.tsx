@@ -12,24 +12,29 @@ import {
   ActivityIndicator,
   Platform,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons'; // Expo vector icons
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import { useAuth } from '../../contexts/AuthContext';
-import { 
-  collection, 
-  addDoc, 
-  doc, 
-  query, 
-  where, 
+import { useAuth } from '../../../contexts/AuthContext';
+import {
+  collection,
+  addDoc,
+  doc,
+  query,
+  where,
   orderBy,
   getDocs,
   getDoc,
   setDoc,
   Timestamp,
-  updateDoc 
+  updateDoc
 } from 'firebase/firestore';
-import { db } from '../../config/firebaseConfig';
+import { db } from '../../../config/firebaseConfig';
+import RazorpayCheckout, {
+  RazorpaySuccessResponse,
+  RazorpayErrorResponse,
+  RazorpayOptions
+} from 'react-native-razorpay';
 
 declare global {
   interface Window {
@@ -53,6 +58,21 @@ type WalletData = {
   balance: number;
   updatedAt: any;
 };
+
+type IoniconName =
+  | "gift"
+  | "sync"
+  | "card"
+  | "refresh"
+  | "arrow-back"
+  | "help-circle-outline"
+  | "add-circle"
+  | "arrow-forward"
+  | "shield-checkmark"
+  | "flash"
+  | "receipt-outline"
+  | "arrow-down"
+  | "arrow-up";
 
 export default function WalletScreen() {
   const { user } = useAuth();
@@ -79,11 +99,10 @@ export default function WalletScreen() {
       setLoading(false);
       return;
     }
-
     try {
       const walletRef = doc(db, 'wallets', user.uid);
       const walletSnap = await getDoc(walletRef);
-      
+
       if (walletSnap.exists()) {
         const data = walletSnap.data() as WalletData;
         setBalance(data.balance || 0);
@@ -108,7 +127,6 @@ export default function WalletScreen() {
       setTransactions([]);
       return;
     }
-
     try {
       const transactionsRef = collection(db, 'transactions');
       const q = query(
@@ -116,13 +134,11 @@ export default function WalletScreen() {
         where('userId', '==', user.uid),
         orderBy('createdAt', 'desc')
       );
-
       const snapshot = await getDocs(q);
       const txnList: Transaction[] = [];
       snapshot.forEach((doc) => {
         txnList.push({ id: doc.id, ...doc.data() } as Transaction);
       });
-      
       setTransactions(txnList);
     } catch (error) {
       console.error('Error loading transactions:', error);
@@ -152,7 +168,7 @@ export default function WalletScreen() {
 
   const handleAddMoney = async () => {
     const amount = parseInt(addAmount);
-    
+
     if (isNaN(amount) || amount < 10) {
       Alert.alert('Error', 'Please enter amount of at least ₹10');
       return;
@@ -166,49 +182,12 @@ export default function WalletScreen() {
     setProcessing(true);
 
     try {
-      const options = {
+      const options: RazorpayOptions = {
         key: 'YOUR_RAZORPAY_KEY_ID',
         amount: amount * 100,
         currency: 'INR',
         name: 'Vint Services',
         description: 'Add money to wallet',
-        handler: async function (response: any) {
-          try {
-            const walletRef = doc(db, 'wallets', user.uid);
-            const walletSnap = await getDoc(walletRef);
-            const currentBalance = walletSnap.exists() ? walletSnap.data().balance : 0;
-
-            await updateDoc(walletRef, {
-              balance: currentBalance + amount,
-              updatedAt: Timestamp.now(),
-            });
-
-            await addDoc(collection(db, 'transactions'), {
-              userId: user.uid,
-              type: 'credit',
-              amount: amount,
-              description: 'Money added to wallet',
-              status: 'completed',
-              referenceId: response.razorpay_payment_id,
-              createdAt: Timestamp.now(),
-            });
-
-            Alert.alert('Success', `₹${amount} added to your wallet successfully!`);
-            setShowAddMoneyModal(false);
-            setAddAmount('');
-            
-            loadWalletData();
-            loadTransactions();
-          } catch (error) {
-            console.error('Error updating wallet:', error);
-            Alert.alert('Error', 'Payment successful but failed to update wallet. Contact support.');
-          }
-        },
-        modal: {
-          ondismiss: function () {
-            Alert.alert('Cancelled', 'Payment was cancelled');
-          },
-        },
         prefill: {
           name: user?.name || '',
           email: user?.email || '',
@@ -224,23 +203,102 @@ export default function WalletScreen() {
       };
 
       if (Platform.OS === 'web') {
-        const razorpay = new window.Razorpay(options);
-        razorpay.on('payment.failed', function (response: any) {
-          Alert.alert('Payment Failed', response.error.description);
-          
+        const razorpay = new window.Razorpay({
+          ...options,
+          handler: async (response: RazorpaySuccessResponse) => {
+            try {
+              const walletRef = doc(db, 'wallets', user.uid);
+              const walletSnap = await getDoc(walletRef);
+              const currentBalance = walletSnap.exists() ? walletSnap.data().balance : 0;
+
+              await updateDoc(walletRef, {
+                balance: currentBalance + amount,
+                updatedAt: Timestamp.now(),
+              });
+
+              await addDoc(collection(db, 'transactions'), {
+                userId: user.uid,
+                type: 'credit',
+                amount: amount,
+                description: 'Money added to wallet',
+                status: 'completed',
+                referenceId: response.razorpay_payment_id,
+                createdAt: Timestamp.now(),
+              });
+
+              Alert.alert('Success', `₹${amount} added to your wallet successfully!`);
+              setShowAddMoneyModal(false);
+              setAddAmount('');
+              loadWalletData();
+              loadTransactions();
+            } catch (error) {
+              console.error('Error updating wallet:', error);
+              Alert.alert('Error', 'Payment successful but failed to update wallet. Contact support.');
+            }
+          },
+          modal: {
+            ondismiss: function () {
+              Alert.alert('Cancelled', 'Payment was cancelled');
+            },
+          },
+        });
+        razorpay.on('payment.failed', (response: RazorpayErrorResponse) => {
+          Alert.alert('Payment Failed', response.description ?? '');
           addDoc(collection(db, 'transactions'), {
             userId: user.uid,
             type: 'credit',
             amount: amount,
             description: 'Failed wallet recharge',
             status: 'failed',
-            referenceId: response.error.metadata?.payment_id || null,
+            referenceId: response.code || null,
             createdAt: Timestamp.now(),
           });
         });
         razorpay.open();
       } else {
-        Alert.alert('Info', 'Mobile Razorpay SDK integration required');
+        RazorpayCheckout.open(options)
+          .then(async (response: RazorpaySuccessResponse) => {
+            try {
+              const walletRef = doc(db, 'wallets', user.uid);
+              const walletSnap = await getDoc(walletRef);
+              const currentBalance = walletSnap.exists() ? walletSnap.data().balance : 0;
+
+              await updateDoc(walletRef, {
+                balance: currentBalance + amount,
+                updatedAt: Timestamp.now(),
+              });
+              await addDoc(collection(db, 'transactions'), {
+                userId: user.uid,
+                type: 'credit',
+                amount: amount,
+                description: 'Money added to wallet',
+                status: 'completed',
+                referenceId: response.razorpay_payment_id,
+                createdAt: Timestamp.now(),
+              });
+              Alert.alert('Success', `₹${amount} added to your wallet successfully!`);
+              setShowAddMoneyModal(false);
+              setAddAmount('');
+              loadWalletData();
+              loadTransactions();
+            } catch (error) {
+              console.error('Error updating wallet:', error);
+              Alert.alert('Error', 'Payment successful but failed to update wallet. Contact support.');
+            }
+          })
+          .catch(async (error: RazorpayErrorResponse) => {
+            Alert.alert('Payment Error', error.description ?? 'Payment cancelled');
+            await addDoc(collection(db, 'transactions'), {
+              userId: user.uid,
+              type: 'credit',
+              amount: amount,
+              description: 'Failed wallet recharge',
+              status: 'failed',
+              referenceId: error.code || null,
+              createdAt: Timestamp.now(),
+            });
+          })
+          .finally(() => setProcessing(false));
       }
     } catch (error) {
       console.error('Razorpay Error:', error);
@@ -264,7 +322,6 @@ export default function WalletScreen() {
 
   const renderTransaction = (transaction: Transaction) => {
     const isCredit = transaction.type === 'credit';
-    
     return (
       <View key={transaction.id} style={styles.transactionCard}>
         <View
@@ -274,12 +331,11 @@ export default function WalletScreen() {
           ]}
         >
           <Ionicons
-            name={isCredit ? 'arrow-down' : 'arrow-up'}
+            name={isCredit ? 'arrow-down' : 'arrow-up' as IoniconName}
             size={20}
             color={isCredit ? '#34C759' : '#FF3B30'}
           />
         </View>
-
         <View style={styles.transactionDetails}>
           <Text style={styles.transactionDescription}>{transaction.description}</Text>
           <Text style={styles.transactionDate}>{formatDate(transaction.createdAt)}</Text>
@@ -287,7 +343,6 @@ export default function WalletScreen() {
             <Text style={styles.transactionRef}>Ref: {transaction.referenceId.slice(0, 12)}...</Text>
           )}
         </View>
-
         <View style={styles.transactionAmount}>
           <Text
             style={[
@@ -353,7 +408,6 @@ export default function WalletScreen() {
             <Text style={styles.balanceAmount}>₹{balance.toLocaleString('en-IN')}</Text>
           </View>
         </View>
-        
         <TouchableOpacity
           style={styles.addMoneyButton}
           onPress={() => setShowAddMoneyModal(true)}
@@ -365,33 +419,19 @@ export default function WalletScreen() {
 
       {/* Quick Actions */}
       <View style={styles.quickActions}>
-        <TouchableOpacity style={styles.quickAction}>
-          <View style={[styles.quickActionIcon, { backgroundColor: '#FFF5E6' }]}>
-            <Ionicons name="gift" size={24} color="#FF9500" />
-          </View>
-          <Text style={styles.quickActionText}>Rewards</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.quickAction}>
-          <View style={[styles.quickActionIcon, { backgroundColor: '#E6F2FF' }]}>
-            <Ionicons name="sync" size={24} color="#007AFF" />
-          </View>
-          <Text style={styles.quickActionText}>Transfer</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.quickAction}>
-          <View style={[styles.quickActionIcon, { backgroundColor: '#E6FFF0' }]}>
-            <Ionicons name="card" size={24} color="#34C759" />
-          </View>
-          <Text style={styles.quickActionText}>Withdraw</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.quickAction} onPress={loadTransactions}>
-          <View style={[styles.quickActionIcon, { backgroundColor: '#FFE6E6' }]}>
-            <Ionicons name="refresh" size={24} color="#FF3B30" />
-          </View>
-          <Text style={styles.quickActionText}>Refresh</Text>
-        </TouchableOpacity>
+        {[
+          { icon: "gift", color: "#FF9500", bg: "#FFF5E6", text: "Rewards" },
+          { icon: "sync", color: "#007AFF", bg: "#E6F2FF", text: "Transfer" },
+          { icon: "card", color: "#34C759", bg: "#E6FFF0", text: "Withdraw" },
+          { icon: "refresh", color: "#FF3B30", bg: "#FFE6E6", text: "Refresh", cb: loadTransactions }
+        ].map(({ icon, color, bg, text, cb }) => (
+          <TouchableOpacity key={text} style={styles.quickAction} onPress={cb}>
+            <View style={[styles.quickActionIcon, { backgroundColor: bg }]}>
+              <Ionicons name={icon as IoniconName} size={24} color={color} />
+            </View>
+            <Text style={styles.quickActionText}>{text}</Text>
+          </TouchableOpacity>
+        ))}
       </View>
 
       {/* Transactions */}
@@ -402,7 +442,6 @@ export default function WalletScreen() {
             <Text style={styles.viewAllText}>Refresh</Text>
           </TouchableOpacity>
         </View>
-
         {transactions.length === 0 ? (
           <View style={styles.emptyState}>
             <Ionicons name="receipt-outline" size={80} color="#e0e0e0" />
@@ -426,8 +465,6 @@ export default function WalletScreen() {
                 <Ionicons name="close" size={24} color="#333" />
               </TouchableOpacity>
             </View>
-
-            {/* Amount Input */}
             <View style={styles.amountInputContainer}>
               <Text style={styles.rupeeSymbol}>₹</Text>
               <TextInput
@@ -444,8 +481,6 @@ export default function WalletScreen() {
                 maxLength={5}
               />
             </View>
-
-            {/* Quick Amount Buttons */}
             <Text style={styles.quickAmountLabel}>Quick Add</Text>
             <View style={styles.quickAmountContainer}>
               {quickAmounts.map((amount) => (
@@ -468,8 +503,6 @@ export default function WalletScreen() {
                 </TouchableOpacity>
               ))}
             </View>
-
-            {/* Benefits */}
             <View style={styles.benefitsContainer}>
               <View style={styles.benefitItem}>
                 <Ionicons name="shield-checkmark" size={20} color="#34C759" />
@@ -480,7 +513,6 @@ export default function WalletScreen() {
                 <Text style={styles.benefitText}>Instant Credit</Text>
               </View>
             </View>
-
             <LinearGradient
               colors={['#667eea', '#764ba2']}
               start={{ x: 0, y: 0 }}
@@ -502,21 +534,20 @@ export default function WalletScreen() {
                 )}
               </TouchableOpacity>
             </LinearGradient>
-
             <Text style={styles.paymentNote}>
               Payment powered by Razorpay • Safe & Secure
             </Text>
           </View>
         </View>
       </Modal>
-
-      {/* Razorpay Script for Web */}
       {Platform.OS === 'web' && (
         <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
       )}
     </SafeAreaView>
   );
 }
+
+
 
 const styles = StyleSheet.create({
   container: {

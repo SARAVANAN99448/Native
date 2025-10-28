@@ -8,29 +8,14 @@ import {
   TouchableOpacity,
   Image,
   Alert,
-  Switch,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../../contexts/AuthContext';
 
 export default function ProfileScreen() {
-  const { user, logout, updateProfile } = useAuth();
-  const [isAvailable, setIsAvailable] = useState(true);
+  const { user, logout } = useAuth();
   const [loading, setLoading] = useState(false);
 
-  const handleAvailabilityToggle = async (value: boolean) => {
-    try {
-      setIsAvailable(value);
-      await updateProfile({ isAvailable: value });
-      Alert.alert(
-        'Availability Updated',
-        value ? 'You are now available for jobs' : 'You are now unavailable for jobs'
-      );
-    } catch (error) {
-      Alert.alert('Error', 'Failed to update availability');
-      setIsAvailable(!value);
-    }
-  };
 
   const handleLogout = async () => {
     Alert.alert(
@@ -67,12 +52,6 @@ export default function ProfileScreen() {
       action: () => Alert.alert('Coming Soon', 'Edit profile functionality'),
     },
     {
-      id: 2,
-      title: 'Services & Skills',
-      icon: 'construct-outline',
-      action: () => Alert.alert('Coming Soon', 'Manage services functionality'),
-    },
-    {
       id: 3,
       title: 'Working Hours',
       icon: 'time-outline',
@@ -83,12 +62,6 @@ export default function ProfileScreen() {
       title: 'Documents',
       icon: 'document-text-outline',
       action: () => Alert.alert('Coming Soon', 'Manage verification documents'),
-    },
-    {
-      id: 5,
-      title: 'Payment Details',
-      icon: 'card-outline',
-      action: () => Alert.alert('Coming Soon', 'Manage payment details'),
     },
     {
       id: 6,
@@ -106,7 +79,7 @@ export default function ProfileScreen() {
       id: 8,
       title: 'Help & Support',
       icon: 'help-circle-outline',
-      action: () => Alert.alert('Help & Support', 'Contact us at support@urbanservices.com'),
+      action: () => Alert.alert('Help & Support', 'Contact us at support@vintservices.com'),
     },
   ];
 
@@ -130,10 +103,6 @@ export default function ProfileScreen() {
                   <Ionicons name="person" size={40} color="#fff" />
                 </View>
               )}
-              <View style={[
-                styles.statusIndicator,
-                { backgroundColor: isAvailable ? '#34C759' : '#FF3B30' }
-              ]} />
             </View>
             <View style={styles.userInfo}>
               <Text style={styles.userName}>{user?.name || 'Technician'}</Text>
@@ -144,30 +113,12 @@ export default function ProfileScreen() {
             </View>
           </View>
           
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.editButton}
             onPress={() => Alert.alert('Coming Soon', 'Edit profile functionality')}
           >
             <Ionicons name="pencil" size={20} color="#007AFF" />
           </TouchableOpacity>
-        </View>
-
-        {/* Availability Toggle */}
-        <View style={styles.availabilitySection}>
-          <View style={styles.availabilityHeader}>
-            <View>
-              <Text style={styles.availabilityTitle}>Availability Status</Text>
-              <Text style={styles.availabilitySubtitle}>
-                {isAvailable ? 'Available for new jobs' : 'Not accepting new jobs'}
-              </Text>
-            </View>
-            <Switch
-              value={isAvailable}
-              onValueChange={handleAvailabilityToggle}
-              trackColor={{ false: '#ccc', true: '#34C759' }}
-              thumbColor={isAvailable ? '#fff' : '#fff'}
-            />
-          </View>
         </View>
 
         {/* Stats */}
@@ -178,23 +129,6 @@ export default function ProfileScreen() {
               <Text style={styles.statLabel}>{stat.label}</Text>
             </View>
           ))}
-        </View>
-
-        {/* Services */}
-        <View style={styles.servicesSection}>
-          <Text style={styles.sectionTitle}>My Services</Text>
-          <View style={styles.servicesContainer}>
-            <Text style={styles.servicesPlaceholder}>
-              No services added yet. Add your skills to start receiving jobs.
-            </Text>
-            <TouchableOpacity 
-              style={styles.addServiceButton}
-              onPress={() => Alert.alert('Coming Soon', 'Add services functionality')}
-            >
-              <Ionicons name="add-circle" size={24} color="#007AFF" />
-              <Text style={styles.addServiceText}>Add Service</Text>
-            </TouchableOpacity>
-          </View>
         </View>
 
         {/* Menu Items */}
@@ -228,13 +162,14 @@ export default function ProfileScreen() {
 
         {/* App Info */}
         <View style={styles.appInfo}>
-          <Text style={styles.appInfoText}>Urban  v1.0.0</Text>
+          <Text style={styles.appInfoText}>vint  v1.0.0</Text>
           <Text style={styles.appInfoText}>Service Provider App</Text>
         </View>
       </ScrollView>
     </SafeAreaView>
   );
 }
+
 
 const styles = StyleSheet.create({
   container: {
@@ -271,16 +206,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  statusIndicator: {
-    position: 'absolute',
-    bottom: 2,
-    right: 2,
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    borderWidth: 2,
-    borderColor: '#fff',
-  },
   userInfo: {
     flex: 1,
   },
@@ -315,27 +240,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  availabilitySection: {
-    backgroundColor: '#fff',
-    marginTop: 12,
-    paddingVertical: 20,
-    paddingHorizontal: 20,
-  },
-  availabilityHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  availabilityTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  availabilitySubtitle: {
-    fontSize: 14,
-    color: '#666',
-    marginTop: 4,
-  },
   statsContainer: {
     backgroundColor: '#fff',
     marginTop: 12,
@@ -357,41 +261,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#666',
     textAlign: 'center',
-  },
-  servicesSection: {
-    backgroundColor: '#fff',
-    marginTop: 12,
-    padding: 20,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 16,
-  },
-  servicesContainer: {
-    alignItems: 'center',
-    paddingVertical: 20,
-  },
-  servicesPlaceholder: {
-    fontSize: 14,
-    color: '#666',
-    textAlign: 'center',
-    marginBottom: 16,
-  },
-  addServiceButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: '#007AFF15',
-    borderRadius: 8,
-  },
-  addServiceText: {
-    fontSize: 16,
-    color: '#007AFF',
-    fontWeight: '500',
-    marginLeft: 8,
   },
   menuContainer: {
     backgroundColor: '#fff',
@@ -439,3 +308,4 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
 });
+  

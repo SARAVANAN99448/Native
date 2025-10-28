@@ -1,34 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  SafeAreaView,
-  ScrollView,
-  TouchableOpacity,
-  Alert,
-  ActivityIndicator,
+  View, Text, StyleSheet, SafeAreaView, ScrollView,
+  TouchableOpacity, Alert, ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth } from '../../../contexts/AuthContext';
 import {
-  collection,
-  query,
-  where,
-  orderBy,
-  getDocs,
-  updateDoc,
-  doc,
-  Timestamp,
+  collection, query, where, orderBy, getDocs,
+  updateDoc, doc, Timestamp, addDoc
 } from 'firebase/firestore';
-import { db } from '../../config/firebaseConfig';
+import { db } from '../../../config/firebaseConfig';
 
 type Booking = {
   id: string;
   serviceName: string;
   customerId: string;
-  providerName: string;
+  providerId?: string | null;
+  providerName?: string;
   scheduledDate: string;
   scheduledTime: string;
   status: string;
@@ -41,7 +29,6 @@ type Booking = {
 
 export default function BookingsScreen() {
   const { user } = useAuth();
-  const router = useRouter();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'upcoming' | 'completed' | 'cancelled'>('upcoming');
@@ -82,6 +69,7 @@ export default function BookingsScreen() {
     }
   };
 
+  // ✅ Send notification to technician when cancelling
   const handleCancelBooking = async (booking: Booking) => {
     Alert.alert(
       'Cancel Booking',
@@ -98,9 +86,24 @@ export default function BookingsScreen() {
                 status: 'cancelled',
                 updatedAt: Timestamp.now(),
               });
+
+              // ✅ If technician was assigned, notify them
+              if (booking.providerId) {
+                await addDoc(collection(db, 'notifications'), {
+                  userId: booking.providerId,
+                  title: 'Booking Cancelled',
+                  message: `Customer cancelled: ${booking.serviceName} scheduled for ${booking.scheduledDate} at ${booking.scheduledTime}`,
+                  type: 'booking_cancelled',
+                  bookingId: booking.id,
+                  isRead: false,
+                  createdAt: Timestamp.now(),
+                });
+              }
+
               Alert.alert('Success', 'Booking cancelled successfully');
               loadBookings();
             } catch (error) {
+              console.error('Error cancelling booking:', error);
               Alert.alert('Error', 'Failed to cancel booking');
             }
           },
@@ -182,10 +185,12 @@ export default function BookingsScreen() {
           </Text>
         </View>
 
-        <View style={styles.detailRow}>
-          <Ionicons name="person-outline" size={16} color="#666" />
-          <Text style={styles.detailText}>{booking.providerName}</Text>
-        </View>
+        {booking.providerName && (
+          <View style={styles.detailRow}>
+            <Ionicons name="person-outline" size={16} color="#666" />
+            <Text style={styles.detailText}>{booking.providerName}</Text>
+          </View>
+        )}
 
         <View style={styles.detailRow}>
           <Ionicons name="cash-outline" size={16} color="#666" />
@@ -228,12 +233,10 @@ export default function BookingsScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>My Bookings</Text>
       </View>
 
-      {/* Tabs */}
       <View style={styles.tabsContainer}>
         <TouchableOpacity
           style={[styles.tab, activeTab === 'upcoming' && styles.activeTab]}
@@ -261,7 +264,6 @@ export default function BookingsScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Bookings List */}
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {filteredBookings.length === 0 ? (
           <View style={styles.emptyState}>
@@ -378,22 +380,22 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     color: '#333',
-    marginBottom: 8,
+    marginTop: 16,
   },
   emptySubtext: {
     fontSize: 14,
     color: '#666',
+    marginTop: 8,
   },
   loadingContainer: {
-  flex: 1,
-  justifyContent: 'center',
-  alignItems: 'center',
-  paddingTop: 50,
-},
-loadingText: {
-  marginTop: 16,
-  fontSize: 16,
-  color: '#666',
-},
-
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingTop: 50,
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#666',
+  },
 });

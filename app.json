@@ -3,11 +3,8 @@
     "name": "vint",
     "slug": "vint",
     "extra": {
-      "clientId": "1080097552471-hp3dg4afltchb258pmmgofh36jgmct3t.apps.googleusercontent.com",
-      "iosClientId": "YOUR_IOS_CLIENT_ID.apps.googleusercontent.com",
-      "androidClientId": "30958469031-is2prbkuq1ijmchktfee22mq6856e01v.apps.googleusercontent.com",
-      "webClientId": "30958469031-is2prbkuq1ijmchktfee22mq6856e01v.apps.googleusercontent.com",
-      "googleClientId": "30958469031-is2prbkuq1ijmchktfee22mq6856e01v.apps.googleusercontent.com",
+      "webClientId": "1051125804819-jgiuubo27g6rrr4ph8vd32f2fujn3i10.apps.googleusercontent.com",
+      "androidClientId":"1051125804819-5m993sk85bdcep4vrppenficu868f72s.apps.googleusercontent.com",
       "router": {},
       "eas": {
         "projectId": "3dcb5aac-bdcc-4412-91ec-b137232f888e"

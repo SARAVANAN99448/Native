@@ -8,61 +8,116 @@ import {
   TouchableOpacity,
   Dimensions,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../../contexts/AuthContext';
-// import { mockFirestore } from '../../../lib/mockFirebase';
-import { Booking } from '../../../lib/types';
-// import { format } from 'date-fns';
+import { db } from '../../../config/firebaseConfig';
+import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
 
 const { width } = Dimensions.get('window');
+
+type Booking = {
+  id: string;
+  serviceName: string;
+  customerName: string;
+  scheduledDate: string;
+  scheduledTime: string;
+  address: {
+    street: string;
+    city: string;
+    state: string;
+  };
+  totalAmount: number;
+  status: string;
+  notes?: string;
+};
 
 export default function DashboardScreen() {
   const { user } = useAuth();
   const [todayJobs, setTodayJobs] = useState<Booking[]>([]);
+  const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
     totalJobs: 0,
     completedJobs: 0,
-    rating: 0,
+    rating: 4.8,
     earnings: 0,
   });
 
-  // useEffect(() => {
-  //   loadDashboardData();
-  // }, [user]);
+  useEffect(() => {
+    if (user?.uid) {
+      loadTodayJobs();
+      loadStats();
+    }
+  }, [user?.uid]);
 
-  // const loadDashboardData = async () => {
-  //   if (!user) return;
+  const loadTodayJobs = async () => {
+    if (!user?.uid) return;
 
-  //   try {
-  //     const allBookings = await mockFirestore.getBookings();
-  //     const technicianBookings = allBookings.filter(booking => booking.technicianId === user.id);
+    try {
+      setLoading(true);
+      const today = new Date().toISOString().split('T')[0]; // Format: YYYY-MM-DD
+
+      const bookingsRef = collection(db, 'bookings');
+      const q = query(
+        bookingsRef,
+        where('providerId', '==', user.uid),
+        where('scheduledDate', '==', today),
+        orderBy('scheduledTime', 'asc')
+      );
+
+      const snapshot = await getDocs(q);
+      const jobs: Booking[] = [];
+      snapshot.forEach((doc) => {
+        jobs.push({ id: doc.id, ...doc.data() } as Booking);
+      });
+
+      setTodayJobs(jobs);
+    } catch (error) {
+      console.error('Error loading today jobs:', error);
+      Alert.alert('Error', 'Failed to load today\'s jobs');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadStats = async () => {
+    if (!user?.uid) return;
+
+    try {
+      const bookingsRef = collection(db, 'bookings');
       
-  //     // Today's jobs
-  //     const today = new Date();
-  //     const todayBookings = technicianBookings.filter(booking => {
-  //       const bookingDate = new Date(booking.scheduledDate);
-  //       return bookingDate.toDateString() === today.toDateString();
-  //     });
+      // Get all jobs for this technician
+      const allJobsQuery = query(
+        bookingsRef,
+        where('providerId', '==', user.uid)
+      );
+      const allJobsSnapshot = await getDocs(allJobsQuery);
       
-  //     setTodayJobs(todayBookings);
-      
-  //     // Calculate stats
-  //     const completedCount = technicianBookings.filter(b => b.status === 'completed').length;
-  //     const totalEarnings = technicianBookings
-  //       .filter(b => b.status === 'completed')
-  //       .reduce((sum, b) => sum + b.totalAmount, 0);
-      
-  //     setStats({
-  //       totalJobs: technicianBookings.length,
-  //       completedJobs: completedCount,
-  //       rating: user.rating || 0,
-  //       earnings: totalEarnings,
-  //     });
-  //   } catch (error) {
-  //     Alert.alert('Error', 'Failed to load dashboard data');
-  //   }
-  // };
+      let totalJobs = 0;
+      let completedJobs = 0;
+      let totalEarnings = 0;
+
+      allJobsSnapshot.forEach((doc) => {
+        const data = doc.data();
+        totalJobs++;
+        
+        if (data.status === 'completed') {
+          completedJobs++;
+          totalEarnings += data.totalAmount || 0;
+        }
+      });
+
+      setStats({
+        totalJobs,
+        completedJobs,
+        rating: 4.8, // You can calculate this from reviews collection later
+        earnings: totalEarnings,
+      });
+    } catch (error) {
+      console.error('Error loading stats:', error);
+    }
+  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -85,7 +140,7 @@ export default function DashboardScreen() {
       title: 'Start Job',
       icon: 'play-circle',
       color: '#34C759',
-      action: () => Alert.alert('Start Job', 'Start job functionality'),
+      action: () => Alert.alert('Start Job', 'Select a job to start'),
     },
     {
       id: 2,
@@ -99,7 +154,7 @@ export default function DashboardScreen() {
       title: 'Complete Job',
       icon: 'checkmark-circle',
       color: '#FF9500',
-      action: () => Alert.alert('Complete Job', 'Complete job functionality'),
+      action: () => Alert.alert('Complete Job', 'Select a job to complete'),
     },
     {
       id: 4,
@@ -117,7 +172,7 @@ export default function DashboardScreen() {
         <View style={styles.header}>
           <View>
             <Text style={styles.greeting}>Welcome back,</Text>
-            <Text style={styles.userName}>{user?.name}!</Text>
+            <Text style={styles.userName}>{user?.name || 'Technician'}!</Text>
           </View>
           <TouchableOpacity style={styles.notificationButton}>
             <Ionicons name="notifications-outline" size={24} color="#333" />
@@ -131,19 +186,19 @@ export default function DashboardScreen() {
             <Text style={styles.statNumber}>{stats.totalJobs}</Text>
             <Text style={styles.statLabel}>Total Jobs</Text>
           </View>
-          
+
           <View style={[styles.statCard, { backgroundColor: '#34C75915' }]}>
             <Ionicons name="checkmark-circle" size={24} color="#34C759" />
             <Text style={styles.statNumber}>{stats.completedJobs}</Text>
             <Text style={styles.statLabel}>Completed</Text>
           </View>
-          
+
           <View style={[styles.statCard, { backgroundColor: '#FFD70015' }]}>
             <Ionicons name="star" size={24} color="#FFD700" />
             <Text style={styles.statNumber}>{stats.rating.toFixed(1)}</Text>
             <Text style={styles.statLabel}>Rating</Text>
           </View>
-          
+
           <View style={[styles.statCard, { backgroundColor: '#FF950015' }]}>
             <Ionicons name="cash" size={24} color="#FF9500" />
             <Text style={styles.statNumber}>₹{stats.earnings}</Text>
@@ -161,7 +216,9 @@ export default function DashboardScreen() {
                 style={styles.actionCard}
                 onPress={action.action}
               >
-                <View style={[styles.actionIcon, { backgroundColor: action.color + '15' }]}>
+                <View
+                  style={[styles.actionIcon, { backgroundColor: action.color + '15' }]}
+                >
                   <Ionicons name={action.icon as any} size={24} color={action.color} />
                 </View>
                 <Text style={styles.actionTitle}>{action.title}</Text>
@@ -174,30 +231,45 @@ export default function DashboardScreen() {
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Today's Jobs</Text>
-            <TouchableOpacity onPress={() => Alert.alert('View All', 'View all jobs')}>
-              <Text style={styles.viewAllText}>View All</Text>
+            <TouchableOpacity onPress={loadTodayJobs}>
+              <Ionicons name="refresh" size={20} color="#007AFF" />
             </TouchableOpacity>
           </View>
-          
-          {todayJobs.length > 0 ? (
+
+          {loading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color="#007AFF" />
+              <Text style={styles.loadingText}>Loading jobs...</Text>
+            </View>
+          ) : todayJobs.length > 0 ? (
             todayJobs.map((job) => (
               <TouchableOpacity
                 key={job.id}
                 style={styles.jobCard}
-                onPress={() => Alert.alert('Job Details', `Job ID: ${job.id}`)}
+                onPress={() => Alert.alert('Job Details', `Job: ${job.serviceName}`)}
               >
                 <View style={styles.jobHeader}>
                   <View style={styles.jobInfo}>
                     <Text style={styles.jobTime}>{job.scheduledTime}</Text>
-                    <View style={[styles.statusBadge, { backgroundColor: getStatusColor(job.status) + '20' }]}>
-                      <Text style={[styles.statusText, { color: getStatusColor(job.status) }]}>
+                    <View
+                      style={[
+                        styles.statusBadge,
+                        { backgroundColor: getStatusColor(job.status) + '20' },
+                      ]}
+                    >
+                      <Text
+                        style={[styles.statusText, { color: getStatusColor(job.status) }]}
+                      >
                         {job.status.toUpperCase()}
                       </Text>
                     </View>
                   </View>
                   <Text style={styles.jobAmount}>₹{job.totalAmount}</Text>
                 </View>
-                
+
+                <Text style={styles.jobService}>{job.serviceName}</Text>
+                <Text style={styles.jobCustomer}>Customer: {job.customerName}</Text>
+
                 <View style={styles.jobDetails}>
                   <View style={styles.jobDetailRow}>
                     <Ionicons name="location-outline" size={16} color="#666" />
@@ -205,7 +277,7 @@ export default function DashboardScreen() {
                       {job.address.street}, {job.address.city}
                     </Text>
                   </View>
-                  
+
                   {job.notes && (
                     <View style={styles.jobDetailRow}>
                       <Ionicons name="document-text-outline" size={16} color="#666" />
@@ -221,6 +293,9 @@ export default function DashboardScreen() {
             <View style={styles.emptyState}>
               <Ionicons name="calendar-outline" size={48} color="#ccc" />
               <Text style={styles.emptyStateText}>No jobs scheduled for today</Text>
+              <Text style={styles.emptyStateSubtext}>
+                Check the Jobs tab to claim available jobs
+              </Text>
             </View>
           )}
         </View>
@@ -297,10 +372,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#333',
   },
-  viewAllText: {
-    fontSize: 14,
-    color: '#007AFF',
-  },
   actionsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -327,6 +398,15 @@ const styles = StyleSheet.create({
     color: '#333',
     textAlign: 'center',
   },
+  loadingContainer: {
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  loadingText: {
+    fontSize: 14,
+    color: '#666',
+    marginTop: 12,
+  },
   jobCard: {
     backgroundColor: '#fff',
     padding: 16,
@@ -337,7 +417,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 8,
   },
   jobInfo: {
     flexDirection: 'row',
@@ -363,6 +443,17 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#333',
   },
+  jobService: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 4,
+  },
+  jobCustomer: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 12,
+  },
   jobDetails: {
     gap: 8,
   },
@@ -384,5 +475,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#666',
     marginTop: 12,
+    fontWeight: '600',
+  },
+  emptyStateSubtext: {
+    fontSize: 14,
+    color: '#999',
+    marginTop: 8,
   },
 });

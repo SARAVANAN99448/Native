@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth } from '../../../contexts/AuthContext';
 import { 
   collection, 
   addDoc, 
@@ -26,7 +26,7 @@ import {
   Timestamp,
   updateDoc 
 } from 'firebase/firestore';
-import { db } from '../../config/firebaseConfig';
+import { db } from '../../../config/firebaseConfig';
 
 // For Web: Include Razorpay script
 declare global {
