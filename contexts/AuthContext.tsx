@@ -20,7 +20,6 @@ import { Alert, Platform } from "react-native";
 
 WebBrowser.maybeCompleteAuthSession();
 
-// Extend Window type for web
 declare global {
   interface Window {
     recaptchaVerifier?: RecaptchaVerifier;
@@ -49,19 +48,13 @@ export const AuthProvider = ({ children }: any) => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
         const customerRef = doc(db, "customers", firebaseUser.uid);
-        const techRef = doc(db, "technicians", firebaseUser.uid);
 
         const customerSnap = await getDoc(customerRef);
-        const techSnap = await getDoc(techRef);
 
         if (customerSnap.exists()) {
           const userData = { uid: firebaseUser.uid, role: "customer", ...customerSnap.data() };
           setUser(userData);
           router.replace("/customer");
-        } else if (techSnap.exists()) {
-          const userData = { uid: firebaseUser.uid, role: "technician", ...techSnap.data() };
-          setUser(userData);
-          router.replace("/technician");
         } else {
           // Create default customer account if no data exists
           await setDoc(doc(db, "customers", firebaseUser.uid), {
@@ -84,36 +77,26 @@ export const AuthProvider = ({ children }: any) => {
     return unsubscribe;
   }, []);
 
-  const register = async ({ name, email, password, phone, role }: any) => {
+  const register = async ({ name, email, password, phone }: any) => {
     const userCred = await createUserWithEmailAndPassword(auth, email, password);
     const uid = userCred.user.uid;
-    const collectionName = role === "technician" ? "technicians" : "customers";
-    await setDoc(doc(db, collectionName, uid), {
+    await setDoc(doc(db, "customers", uid), {
       name,
       email,
       phone,
-      role,
+      role: "customer",
       createdAt: new Date().toISOString(),
     });
   };
 
-  // ✅ UPDATED: Return user data with role
   const login = async (email: string, password: string) => {
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
     const uid = userCredential.user.uid;
 
-    // Check in customers collection first
+    // Only allow customer login
     const customerDoc = await getDoc(doc(db, 'customers', uid));
     if (customerDoc.exists()) {
       const userData = { uid, ...customerDoc.data(), role: 'customer' };
-      setUser(userData);
-      return userData;
-    }
-
-    // Check in technicians collection
-    const techDoc = await getDoc(doc(db, 'technicians', uid));
-    if (techDoc.exists()) {
-      const userData = { uid, ...techDoc.data(), role: 'technician' };
       setUser(userData);
       return userData;
     }
@@ -180,7 +163,6 @@ export const AuthProvider = ({ children }: any) => {
     }
   };
 
-  // ✅ UPDATED: Return user data with role
   const verifyOTP = async (otp: string) => {
     try {
       let result;
@@ -202,20 +184,13 @@ export const AuthProvider = ({ children }: any) => {
       }
 
       const uid = result.user.uid;
-
-      // Check existing user role
+      // Only allow/recreate customer role
       const customerRef = doc(db, "customers", uid);
-      const techRef = doc(db, "technicians", uid);
 
       const customerSnap = await getDoc(customerRef);
-      const techSnap = await getDoc(techRef);
 
       if (customerSnap.exists()) {
         const userData = { uid, ...customerSnap.data(), role: 'customer' };
-        setUser(userData);
-        return userData;
-      } else if (techSnap.exists()) {
-        const userData = { uid, ...techSnap.data(), role: 'technician' };
         setUser(userData);
         return userData;
       } else {

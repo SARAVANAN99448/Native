@@ -18,14 +18,12 @@ import { useAuth } from "../../contexts/AuthContext";
 import { FirebaseRecaptchaVerifierModal } from "expo-firebase-recaptcha";
 import { app } from "../../config/firebaseConfig";
 
-type UserRole = "customer" | "technician";
-
 interface FormData {
   name: string;
   email: string;
   password: string;
   phone: string;
-  role: UserRole;
+  role: "customer";
 }
 
 export default function AuthScreen() {
@@ -36,7 +34,7 @@ export default function AuthScreen() {
     email: "",
     password: "",
     phone: "+91",
-    role: "customer",
+    role: "customer", // always customer
   });
   const [otpSent, setOtpSent] = useState(false);
   const [otp, setOtp] = useState("");
@@ -46,117 +44,86 @@ export default function AuthScreen() {
   const { login, register, googleLogin, sendOTP, verifyOTP } = useAuth();
   const recaptchaVerifier = useRef(null);
 
-  // Role selector component
-  const RoleSelector = () => (
-    <View style={styles.roleSelectorContainer}>
-      {["customer", "technician"].map((roleOption) => (
-        <TouchableOpacity
-          key={roleOption}
-          style={[
-            styles.roleButton,
-            formData.role === roleOption && styles.roleButtonActive,
-          ]}
-          disabled={loading}
-          onPress={() => setFormData({ ...formData, role: roleOption as UserRole })}
-        >
-          <Text
-            style={[
-              styles.roleButtonText,
-              formData.role === roleOption && styles.roleButtonTextActive,
-            ]}
-          >
-            {roleOption.charAt(0).toUpperCase() + roleOption.slice(1)}
-          </Text>
-        </TouchableOpacity>
-      ))}
-    </View>
-  );
+  const handleEmailAuth = async () => {
+    if (isLogin) {
+      if (!formData.email || !formData.password)
+        return Alert.alert("Error", "Enter email & password");
+      try {
+        setLoading(true);
+        const userData = await login(formData.email, formData.password);
 
-const handleEmailAuth = async () => {
-  if (isLogin) {
-    if (!formData.email || !formData.password)
-      return Alert.alert("Error", "Enter email & password");
-    try {
-      setLoading(true);
-      const userData = await login(formData.email, formData.password);
-      
-      // Navigate based on ACTUAL user role from database, not UI selection
-      if (userData.role === "technician") {
-        router.replace("/technician");
-      } else if (userData.role === "customer") {
-        router.replace("/customer");
-      } else {
-        Alert.alert("Error", "Invalid user role");
+        // Only route as customer
+        if (userData.role === "customer") {
+          router.replace("/customer");
+        } else {
+          Alert.alert("Error", "Invalid user role");
+        }
+      } catch (e: any) {
+        Alert.alert("Login Error", e.message);
+      } finally {
+        setLoading(false);
       }
-    } catch (e: any) {
-      Alert.alert("Login Error", e.message);
-    } finally {
-      setLoading(false);
-    }
-  } else {
-    // Registration flow stays the same
-    if (!formData.name || !formData.email || !formData.password)
-      return Alert.alert("Error", "Fill all fields");
-    if (formData.password.length < 6)
-      return Alert.alert(
-        "Weak Password",
-        "Password must be at least 6 characters"
-      );
-    try {
-      setLoading(true);
-      await register(formData);
-      Alert.alert("Success", "Account created! Please sign in.");
-      setIsLogin(true);
-    } catch (e: any) {
-      Alert.alert("Registration Error", e.message || "Failed to register");
-    } finally {
-      setLoading(false);
-    }
-  }
-};
-
-const handlePhoneAuth = async () => {
-  if (!formData.phone || !/^\+91\d{10}$/.test(formData.phone))
-    return Alert.alert("Invalid Phone", "Use +91XXXXXXXXXX format");
-
-  if (!otpSent) {
-    try {
-      setLoading(true);
-      await sendOTP(
-        formData.phone,
-        Platform.OS === "web" ? undefined : recaptchaVerifier.current
-      );
-      setOtpSent(true);
-      Alert.alert("OTP Sent", "Check your phone for the verification code.");
-    } catch (error: any) {
-      Alert.alert("Error", error.message || "Failed to send OTP");
-    } finally {
-      setLoading(false);
-    }
-  } else {
-    if (!otp || otp.length !== 6)
-      return Alert.alert("Invalid OTP", "Enter 6-digit OTP");
-    try {
-      setLoading(true);
-      const userData = await verifyOTP(otp);
-      Alert.alert("Success", "Phone verified successfully!");
-      
-      // Navigate based on ACTUAL user role from database
-      if (userData.role === "technician") {
-        router.replace("/technician");
-      } else if (userData.role === "customer") {
-        router.replace("/customer");
-      } else {
-        Alert.alert("Error", "Invalid user role");
+    } else {
+      // Registration flow stays the same
+      if (!formData.name || !formData.email || !formData.password)
+        return Alert.alert("Error", "Fill all fields");
+      if (formData.password.length < 6)
+        return Alert.alert(
+          "Weak Password",
+          "Password must be at least 6 characters"
+        );
+      try {
+        setLoading(true);
+        await register(formData);
+        Alert.alert("Success", "Account created! Please sign in.");
+        setIsLogin(true);
+      } catch (e: any) {
+        Alert.alert("Registration Error", e.message || "Failed to register");
+      } finally {
+        setLoading(false);
       }
-    } catch (error: any) {
-      Alert.alert("Verification Failed", error.message || "Invalid OTP");
-    } finally {
-      setLoading(false);
     }
-  }
-};
+  };
 
+  const handlePhoneAuth = async () => {
+    if (!formData.phone || !/^\+91\d{10}$/.test(formData.phone))
+      return Alert.alert("Invalid Phone", "Use +91XXXXXXXXXX format");
+
+    if (!otpSent) {
+      try {
+        setLoading(true);
+        await sendOTP(
+          formData.phone,
+          Platform.OS === "web" ? undefined : recaptchaVerifier.current
+        );
+        setOtpSent(true);
+        Alert.alert("OTP Sent", "Check your phone for the verification code.");
+      } catch (error: any) {
+        Alert.alert("Error", error.message || "Failed to send OTP");
+      } finally {
+        setLoading(false);
+      }
+    } else {
+      if (!otp || otp.length !== 6)
+        return Alert.alert("Invalid OTP", "Enter 6-digit OTP");
+      try {
+        setLoading(true);
+        const userData = await verifyOTP(otp);
+        Alert.alert("Success", "Phone verified successfully!");
+
+        // Only route as customer
+        if (userData.role === "customer") {
+          router.replace("/customer");
+        } else {
+          Alert.alert("Error", "Invalid user role");
+        }
+      } catch (error: any) {
+        Alert.alert("Verification Failed", error.message || "Invalid OTP");
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
 
   const handleSubmit = async () => {
     if (authMethod === "email") await handleEmailAuth();
@@ -190,16 +157,22 @@ const handlePhoneAuth = async () => {
           <View style={styles.header}>
             <Image
               style={styles.logo}
-              source={{ uri: "https://vintenterprises.in/wp-content/uploads/2022/03/Untitled-design-99.png" }}
+              source={{
+                uri: "https://vintenterprises.in/wp-content/uploads/2022/03/Untitled-design-99.png",
+              }}
               resizeMode="contain"
             />
             <Text style={styles.title}>Vint Solar</Text>
             <Text style={styles.subtitle}>
-              {isLogin ? "Welcome back!" : otpSent ? "Verify your phone" : "Join our community"}
+              {isLogin
+                ? "Welcome back!"
+                : otpSent
+                ? "Verify your phone"
+                : "Join our community"}
             </Text>
           </View>
 
-          {!otpSent && <RoleSelector />}
+          {/* No Role Selector here */}
 
           {!otpSent && (
             <View style={styles.tabContainer}>
@@ -209,7 +182,10 @@ const handlePhoneAuth = async () => {
                 disabled={loading}
               >
                 <Text
-                  style={[styles.tabText, authMethod === "email" && styles.tabTextActive]}
+                  style={[
+                    styles.tabText,
+                    authMethod === "email" && styles.tabTextActive,
+                  ]}
                 >
                   Email
                 </Text>
@@ -220,7 +196,10 @@ const handlePhoneAuth = async () => {
                 disabled={loading}
               >
                 <Text
-                  style={[styles.tabText, authMethod === "phone" && styles.tabTextActive]}
+                  style={[
+                    styles.tabText,
+                    authMethod === "phone" && styles.tabTextActive,
+                  ]}
                 >
                   Phone
                 </Text>
@@ -236,7 +215,9 @@ const handlePhoneAuth = async () => {
                     style={styles.input}
                     placeholder="Full Name"
                     value={formData.name}
-                    onChangeText={(text) => setFormData({ ...formData, name: text })}
+                    onChangeText={(text) =>
+                      setFormData({ ...formData, name: text })
+                    }
                     editable={!loading}
                     autoCapitalize="words"
                   />
@@ -245,7 +226,9 @@ const handlePhoneAuth = async () => {
                   style={styles.input}
                   placeholder="Email"
                   value={formData.email}
-                  onChangeText={(text) => setFormData({ ...formData, email: text })}
+                  onChangeText={(text) =>
+                    setFormData({ ...formData, email: text })
+                  }
                   keyboardType="email-address"
                   autoCapitalize="none"
                   editable={!loading}
@@ -255,7 +238,9 @@ const handlePhoneAuth = async () => {
                   style={styles.input}
                   placeholder="Password"
                   value={formData.password}
-                  onChangeText={(text) => setFormData({ ...formData, password: text })}
+                  onChangeText={(text) =>
+                    setFormData({ ...formData, password: text })
+                  }
                   secureTextEntry
                   editable={!loading}
                   autoComplete="password"
@@ -281,7 +266,9 @@ const handlePhoneAuth = async () => {
                 ) : (
                   <>
                     <View style={styles.otpInfo}>
-                      <Text style={styles.otpInfoText}>Enter the 6-digit code sent to</Text>
+                      <Text style={styles.otpInfoText}>
+                        Enter the 6-digit code sent to
+                      </Text>
                       <Text style={styles.phoneNumber}>{formData.phone}</Text>
                     </View>
                     <TextInput
@@ -372,30 +359,6 @@ const styles = StyleSheet.create({
   logo: { width: 100, height: 100 },
   title: { fontSize: 32, fontWeight: "bold", color: "#333", marginTop: 16 },
   subtitle: { fontSize: 16, color: "#666", marginTop: 8 },
-  roleSelectorContainer: {
-    flexDirection: "row",
-    justifyContent: "center",
-    marginVertical: 20,
-  },
-  roleButton: {
-    borderWidth: 1,
-    borderColor: "#007AFF",
-    borderRadius: 25,
-    paddingVertical: 10,
-    paddingHorizontal: 25,
-    marginHorizontal: 5,
-  },
-  roleButtonActive: {
-    backgroundColor: "#007AFF",
-  },
-  roleButtonText: {
-    color: "#007AFF",
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  roleButtonTextActive: {
-    color: "#fff",
-  },
   tabContainer: {
     flexDirection: "row",
     marginHorizontal: 24,

@@ -247,37 +247,23 @@ export default function HomeScreen() {
   };
 
   // ✅ BOOK SERVICE WITH ASYNCSTORAGE
-  const handleServicePress = async (service: Service) => {
-    Alert.alert(
-      service.name,
-      `Price: ₹${service.price}\nDuration: ${service.duration} mins\n\nWould you like to book this service?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Book Now',
-          onPress: async () => {
-            try {
-              // Store service data in AsyncStorage
-              await AsyncStorage.setItem('selectedService', JSON.stringify({
-                id: service.id,
-                name: service.name,
-                price: service.price,
-                duration: service.duration,
-                description: service.description,
-                image: service.image,
-              }));
-              
-              // Navigate to BookingModal
-              router.push('/customer/screens/BookingModal');
-            } catch (error) {
-              console.error('Error storing service data:', error);
-              Alert.alert('Error', 'Failed to proceed with booking');
-            }
-          },
-        },
-      ]
-    );
-  };
+const handleServicePress = async (service: Service) => {
+  try {
+    await AsyncStorage.setItem('selectedService', JSON.stringify({
+      id: service.id,
+      name: service.name,
+      price: service.price,
+      duration: service.duration,
+      description: service.description,
+      image: service.image,
+    }));
+    // Directly navigate to Booking screen/modal
+    router.push('/customer/screens/BookingModal');
+  } catch (error) {
+    console.error('Error storing service data:', error);
+    Alert.alert('Error', 'Failed to proceed with booking');
+  }
+};
 
   const handleRepeatBooking = () => {
     router.push('/customer/screens/BookingsScreen');
