@@ -18,122 +18,59 @@ import { useAuth } from "../../contexts/AuthContext";
 import { FirebaseRecaptchaVerifierModal } from "expo-firebase-recaptcha";
 import { app } from "../../config/firebaseConfig";
 
-interface FormData {
-  name: string;
-  email: string;
-  password: string;
-  phone: string;
-  role: "customer";
-}
-
 export default function AuthScreen() {
-  const [isLogin, setIsLogin] = useState(true);
-  const [authMethod, setAuthMethod] = useState<"email" | "phone">("email");
-  const [formData, setFormData] = useState<FormData>({
-    name: "",
-    email: "",
-    password: "",
-    phone: "+91",
-    role: "customer", // always customer
-  });
+  const [phone, setPhone] = useState("+91");
   const [otpSent, setOtpSent] = useState(false);
   const [otp, setOtp] = useState("");
   const [loading, setLoading] = useState(false);
 
   const router = useRouter();
-  const { login, register, googleLogin, sendOTP, verifyOTP } = useAuth();
-  const recaptchaVerifier = useRef(null);
-
-  const handleEmailAuth = async () => {
-    if (isLogin) {
-      if (!formData.email || !formData.password)
-        return Alert.alert("Error", "Enter email & password");
-      try {
-        setLoading(true);
-        const userData = await login(formData.email, formData.password);
-
-        // Only route as customer
-        if (userData.role === "customer") {
-          router.replace("/customer");
-        } else {
-          Alert.alert("Error", "Invalid user role");
-        }
-      } catch (e: any) {
-        Alert.alert("Login Error", e.message);
-      } finally {
-        setLoading(false);
-      }
-    } else {
-      // Registration flow stays the same
-      if (!formData.name || !formData.email || !formData.password)
-        return Alert.alert("Error", "Fill all fields");
-      if (formData.password.length < 6)
-        return Alert.alert(
-          "Weak Password",
-          "Password must be at least 6 characters"
-        );
-      try {
-        setLoading(true);
-        await register(formData);
-        Alert.alert("Success", "Account created! Please sign in.");
-        setIsLogin(true);
-      } catch (e: any) {
-        Alert.alert("Registration Error", e.message || "Failed to register");
-      } finally {
-        setLoading(false);
-      }
-    }
-  };
+  const { sendOTP, verifyOTP } = useAuth();
+  const recaptchaVerifier = useRef<any>(null);
 
   const handlePhoneAuth = async () => {
-    if (!formData.phone || !/^\+91\d{10}$/.test(formData.phone))
-      return Alert.alert("Invalid Phone", "Use +91XXXXXXXXXX format");
+    if (!/^\+91\d{10}$/.test(phone)) {
+      Alert.alert("Invalid Phone", "Use +91XXXXXXXXXX format");
+      return;
+    }
 
     if (!otpSent) {
       try {
         setLoading(true);
         await sendOTP(
-          formData.phone,
+          phone,
           Platform.OS === "web" ? undefined : recaptchaVerifier.current
         );
         setOtpSent(true);
-        Alert.alert("OTP Sent", "Check your phone for the verification code.");
-      } catch (error: any) {
-        Alert.alert("Error", error.message || "Failed to send OTP");
+      } catch {
+        Alert.alert("Error", "Failed to send OTP");
       } finally {
         setLoading(false);
       }
     } else {
-      if (!otp || otp.length !== 6)
-        return Alert.alert("Invalid OTP", "Enter 6-digit OTP");
+      if (otp.length !== 6) return;
       try {
         setLoading(true);
         const userData = await verifyOTP(otp);
-        Alert.alert("Success", "Phone verified successfully!");
-
-        // Only route as customer
         if (userData.role === "customer") {
           router.replace("/customer");
         } else {
           Alert.alert("Error", "Invalid user role");
         }
-      } catch (error: any) {
-        Alert.alert("Verification Failed", error.message || "Invalid OTP");
+      } catch {
+        Alert.alert("Verification Failed", "Invalid or expired OTP. Try again.");
       } finally {
         setLoading(false);
       }
     }
   };
 
-  const handleSubmit = async () => {
-    if (authMethod === "email") await handleEmailAuth();
-    else await handlePhoneAuth();
-  };
-
   const handleOTPChange = (text: string) => {
     const cleaned = text.replace(/\D/g, "");
     setOtp(cleaned);
-    if (cleaned.length === 6) setTimeout(() => handlePhoneAuth(), 100);
+    if (cleaned.length === 6) {
+      setTimeout(() => handlePhoneAuth(), 100);
+    }
   };
 
   return (
@@ -164,161 +101,64 @@ export default function AuthScreen() {
             />
             <Text style={styles.title}>Vint Solar</Text>
             <Text style={styles.subtitle}>
-              {isLogin
-                ? "Welcome back!"
-                : otpSent
-                ? "Verify your phone"
-                : "Join our community"}
+              {otpSent ? "Verify your phone" : "Login with your phone"}
             </Text>
           </View>
 
-          {/* No Role Selector here */}
-
-          {!otpSent && (
-            <View style={styles.tabContainer}>
-              <TouchableOpacity
-                style={[styles.tab, authMethod === "email" && styles.tabActive]}
-                onPress={() => setAuthMethod("email")}
-                disabled={loading}
-              >
-                <Text
-                  style={[
-                    styles.tabText,
-                    authMethod === "email" && styles.tabTextActive,
-                  ]}
-                >
-                  Email
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.tab, authMethod === "phone" && styles.tabActive]}
-                onPress={() => setAuthMethod("phone")}
-                disabled={loading}
-              >
-                <Text
-                  style={[
-                    styles.tabText,
-                    authMethod === "phone" && styles.tabTextActive,
-                  ]}
-                >
-                  Phone
-                </Text>
-              </TouchableOpacity>
-            </View>
-          )}
-
           <View style={styles.form}>
-            {authMethod === "email" ? (
-              <>
-                {!isLogin && (
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Full Name"
-                    value={formData.name}
-                    onChangeText={(text) =>
-                      setFormData({ ...formData, name: text })
-                    }
-                    editable={!loading}
-                    autoCapitalize="words"
-                  />
-                )}
-                <TextInput
-                  style={styles.input}
-                  placeholder="Email"
-                  value={formData.email}
-                  onChangeText={(text) =>
-                    setFormData({ ...formData, email: text })
-                  }
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  editable={!loading}
-                  autoComplete="email"
-                />
-                <TextInput
-                  style={styles.input}
-                  placeholder="Password"
-                  value={formData.password}
-                  onChangeText={(text) =>
-                    setFormData({ ...formData, password: text })
-                  }
-                  secureTextEntry
-                  editable={!loading}
-                  autoComplete="password"
-                />
-              </>
+            {!otpSent ? (
+              <TextInput
+                style={styles.input}
+                placeholder="Phone (+91XXXXXXXXXX)"
+                value={phone}
+                onChangeText={(text) => {
+                  let cleaned = text.replace(/[^\d]/g, "");
+                  if (cleaned.startsWith("91")) cleaned = cleaned.slice(2);
+                  cleaned = cleaned.slice(0, 10);
+                  setPhone("+91" + cleaned);
+                }}
+                keyboardType="phone-pad"
+                maxLength={13}
+                editable={!loading}
+              />
             ) : (
               <>
-                {!otpSent ? (
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Phone (+91XXXXXXXXXX)"
-                    value={formData.phone}
-                    onChangeText={(text) => {
-                      let cleaned = text.replace(/[^\d]/g, "");
-                      if (cleaned.startsWith("91")) cleaned = cleaned.slice(2);
-                      cleaned = cleaned.slice(0, 10);
-                      setFormData({ ...formData, phone: "+91" + cleaned });
-                    }}
-                    keyboardType="phone-pad"
-                    maxLength={13}
-                    editable={!loading}
-                  />
-                ) : (
-                  <>
-                    <View style={styles.otpInfo}>
-                      <Text style={styles.otpInfoText}>
-                        Enter the 6-digit code sent to
-                      </Text>
-                      <Text style={styles.phoneNumber}>{formData.phone}</Text>
-                    </View>
-                    <TextInput
-                      style={[styles.input, styles.otpInput]}
-                      placeholder="••••••"
-                      value={otp}
-                      onChangeText={handleOTPChange}
-                      keyboardType="number-pad"
-                      maxLength={6}
-                      editable={!loading}
-                      textContentType="oneTimeCode"
-                      autoComplete="sms-otp"
-                      autoFocus
-                    />
-                  </>
-                )}
+                <View style={styles.otpInfo}>
+                  <Text style={styles.otpInfoText}>
+                    Enter the 6‑digit code sent to
+                  </Text>
+                  <Text style={styles.phoneNumber}>{phone}</Text>
+                </View>
+                <TextInput
+                  style={[styles.input, styles.otpInput]}
+                  placeholder="••••••"
+                  value={otp}
+                  onChangeText={handleOTPChange}
+                  keyboardType="number-pad"
+                  maxLength={6}
+                  editable={!loading}
+                  textContentType="oneTimeCode"
+                  autoComplete="sms-otp"
+                  autoFocus
+                />
               </>
             )}
 
             <TouchableOpacity
               style={[styles.submitButton, loading && styles.submitButtonDisabled]}
-              onPress={handleSubmit}
+              onPress={handlePhoneAuth}
               disabled={loading}
             >
               {loading ? (
                 <ActivityIndicator color="#fff" />
               ) : (
                 <Text style={styles.submitButtonText}>
-                  {authMethod === "phone" && otpSent
-                    ? "Verify OTP"
-                    : authMethod === "phone"
-                    ? "Send OTP"
-                    : isLogin
-                    ? "Sign In"
-                    : "Sign Up"}
+                  {otpSent ? "Verify OTP" : "Send OTP"}
                 </Text>
               )}
             </TouchableOpacity>
 
-            {!otpSent && authMethod === "email" && (
-              <TouchableOpacity
-                style={[styles.submitButton, styles.googleButton]}
-                onPress={googleLogin}
-                disabled={loading}
-              >
-                <Text style={styles.submitButtonText}>Sign in with Google</Text>
-              </TouchableOpacity>
-            )}
-
-            {otpSent ? (
+            {otpSent && (
               <TouchableOpacity
                 style={styles.switchButton}
                 onPress={() => {
@@ -327,21 +167,8 @@ export default function AuthScreen() {
                 }}
                 disabled={loading}
               >
-                <Text style={styles.switchButtonText}>← Back to Phone Number</Text>
-              </TouchableOpacity>
-            ) : (
-              <TouchableOpacity
-                style={styles.switchButton}
-                onPress={() => {
-                  setIsLogin(!isLogin);
-                  setAuthMethod("email");
-                }}
-                disabled={loading}
-              >
                 <Text style={styles.switchButtonText}>
-                  {isLogin
-                    ? "Don't have an account? Sign Up"
-                    : "Already have an account? Sign In"}
+                  ← Back to Phone Number
                 </Text>
               </TouchableOpacity>
             )}
@@ -355,27 +182,14 @@ export default function AuthScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#fff" },
   scrollContent: { flexGrow: 1, paddingBottom: 40 },
-  header: { alignItems: "center", paddingTop: 60, paddingBottom: 40 },
+  header: {
+    alignItems: "center",
+    paddingTop: 60,
+    paddingBottom: 10,
+  },
   logo: { width: 100, height: 100 },
   title: { fontSize: 32, fontWeight: "bold", color: "#333", marginTop: 16 },
   subtitle: { fontSize: 16, color: "#666", marginTop: 8 },
-  tabContainer: {
-    flexDirection: "row",
-    marginHorizontal: 24,
-    marginBottom: 24,
-    backgroundColor: "#f8f9fa",
-    borderRadius: 12,
-    padding: 4,
-  },
-  tab: {
-    flex: 1,
-    paddingVertical: 12,
-    alignItems: "center",
-    borderRadius: 10,
-  },
-  tabActive: { backgroundColor: "#007AFF" },
-  tabText: { fontSize: 16, color: "#666", fontWeight: "600" },
-  tabTextActive: { color: "#fff" },
   form: { flex: 1, paddingHorizontal: 24 },
   input: {
     backgroundColor: "#f8f9fa",
@@ -406,7 +220,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   submitButtonDisabled: { opacity: 0.6 },
-  googleButton: { backgroundColor: "#DB4437" },
   submitButtonText: { color: "#fff", fontSize: 18, fontWeight: "600" },
   switchButton: { alignItems: "center", paddingVertical: 16 },
   switchButtonText: { color: "#007AFF", fontSize: 16 },

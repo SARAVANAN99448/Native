@@ -10,9 +10,8 @@ import {
   Modal,
   TextInput,
   ActivityIndicator,
-  Platform,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons'; // Expo vector icons
+import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../../contexts/AuthContext';
@@ -32,15 +31,8 @@ import {
 import { db } from '../../../config/firebaseConfig';
 import RazorpayCheckout, {
   RazorpaySuccessResponse,
-  RazorpayErrorResponse,
-  RazorpayOptions
-} from 'react-native-razorpay';
-
-declare global {
-  interface Window {
-    Razorpay: any;
-  }
-}
+  RazorpayErrorResponse
+} from 'react-native-razorpay'; // ✅ Mobile-only
 
 type Transaction = {
   id: string;
@@ -166,6 +158,7 @@ export default function WalletScreen() {
     setAddAmount(amount.toString());
   };
 
+  // ✅ MOBILE-ONLY: Razorpay Native SDK
   const handleAddMoney = async () => {
     const amount = parseInt(addAmount);
 
@@ -182,12 +175,13 @@ export default function WalletScreen() {
     setProcessing(true);
 
     try {
-      const options: RazorpayOptions = {
-        key: 'YOUR_RAZORPAY_KEY_ID',
-        amount: amount * 100,
+      const options = {
+        key: 'rzp_test_YOUR_KEY_ID', // Replace with your test/live key
+        amount: amount * 100, // Amount in paise
         currency: 'INR',
         name: 'Vint Services',
         description: 'Add money to wallet',
+        image: '', // Add your app logo URL
         prefill: {
           name: user?.name || '',
           email: user?.email || '',
@@ -195,115 +189,69 @@ export default function WalletScreen() {
         },
         notes: {
           purpose: 'wallet_recharge',
-          userId: user.uid,
+          userId: user!.uid,
         },
         theme: {
           color: '#667eea',
         },
       };
 
-      if (Platform.OS === 'web') {
-        const razorpay = new window.Razorpay({
-          ...options,
-          handler: async (response: RazorpaySuccessResponse) => {
-            try {
-              const walletRef = doc(db, 'wallets', user.uid);
-              const walletSnap = await getDoc(walletRef);
-              const currentBalance = walletSnap.exists() ? walletSnap.data().balance : 0;
+      RazorpayCheckout.open(options)
+        .then(async (data: RazorpaySuccessResponse) => {
+          // ✅ Server-side verification recommended (Firebase Functions)
+          console.log('✅ Payment Success:', data);
 
-              await updateDoc(walletRef, {
-                balance: currentBalance + amount,
-                updatedAt: Timestamp.now(),
-              });
+          // Update wallet balance
+          const walletRef = doc(db, 'wallets', user!.uid);
+          const walletSnap = await getDoc(walletRef);
+          const currentBalance = walletSnap.exists() ? walletSnap.data()?.balance || 0 : 0;
 
-              await addDoc(collection(db, 'transactions'), {
-                userId: user.uid,
-                type: 'credit',
-                amount: amount,
-                description: 'Money added to wallet',
-                status: 'completed',
-                referenceId: response.razorpay_payment_id,
-                createdAt: Timestamp.now(),
-              });
+          await updateDoc(walletRef, {
+            balance: currentBalance + amount,
+            updatedAt: Timestamp.now(),
+          });
 
-              Alert.alert('Success', `₹${amount} added to your wallet successfully!`);
-              setShowAddMoneyModal(false);
-              setAddAmount('');
-              loadWalletData();
-              loadTransactions();
-            } catch (error) {
-              console.error('Error updating wallet:', error);
-              Alert.alert('Error', 'Payment successful but failed to update wallet. Contact support.');
-            }
-          },
-          modal: {
-            ondismiss: function () {
-              Alert.alert('Cancelled', 'Payment was cancelled');
-            },
-          },
-        });
-        razorpay.on('payment.failed', (response: RazorpayErrorResponse) => {
-          Alert.alert('Payment Failed', response.description ?? '');
-          addDoc(collection(db, 'transactions'), {
-            userId: user.uid,
-            type: 'credit',
+          // Add transaction record
+          await addDoc(collection(db, 'transactions'), {
+            userId: user!.uid,
+            type: 'credit' as const,
+            amount: amount,
+            description: 'Money added to wallet',
+            status: 'completed',
+            referenceId: data.razorpay_payment_id,
+            createdAt: Timestamp.now(),
+          });
+
+          Alert.alert('Success', `₹${amount.toLocaleString('en-IN')} added to your wallet!`);
+          setShowAddMoneyModal(false);
+          setAddAmount('');
+          loadWalletData();
+          loadTransactions();
+        })
+        .catch(async (error: RazorpayErrorResponse) => {
+          console.error('❌ Payment Error:', error);
+          
+          // Log failed attempt
+          await addDoc(collection(db, 'transactions'), {
+            userId: user!.uid,
+            type: 'credit' as const,
             amount: amount,
             description: 'Failed wallet recharge',
             status: 'failed',
-            referenceId: response.code || null,
+            referenceId: error.code || null,
             createdAt: Timestamp.now(),
           });
-        });
-        razorpay.open();
-      } else {
-        RazorpayCheckout.open(options)
-          .then(async (response: RazorpaySuccessResponse) => {
-            try {
-              const walletRef = doc(db, 'wallets', user.uid);
-              const walletSnap = await getDoc(walletRef);
-              const currentBalance = walletSnap.exists() ? walletSnap.data().balance : 0;
 
-              await updateDoc(walletRef, {
-                balance: currentBalance + amount,
-                updatedAt: Timestamp.now(),
-              });
-              await addDoc(collection(db, 'transactions'), {
-                userId: user.uid,
-                type: 'credit',
-                amount: amount,
-                description: 'Money added to wallet',
-                status: 'completed',
-                referenceId: response.razorpay_payment_id,
-                createdAt: Timestamp.now(),
-              });
-              Alert.alert('Success', `₹${amount} added to your wallet successfully!`);
-              setShowAddMoneyModal(false);
-              setAddAmount('');
-              loadWalletData();
-              loadTransactions();
-            } catch (error) {
-              console.error('Error updating wallet:', error);
-              Alert.alert('Error', 'Payment successful but failed to update wallet. Contact support.');
-            }
-          })
-          .catch(async (error: RazorpayErrorResponse) => {
-            Alert.alert('Payment Error', error.description ?? 'Payment cancelled');
-            await addDoc(collection(db, 'transactions'), {
-              userId: user.uid,
-              type: 'credit',
-              amount: amount,
-              description: 'Failed wallet recharge',
-              status: 'failed',
-              referenceId: error.code || null,
-              createdAt: Timestamp.now(),
-            });
-          })
-          .finally(() => setProcessing(false));
-      }
+          if (error.code !== 'E_CANCELLED') {
+            Alert.alert('Payment Failed', error.description ?? 'Payment failed');
+          }
+        })
+        .finally(() => {
+          setProcessing(false);
+        });
     } catch (error) {
       console.error('Razorpay Error:', error);
       Alert.alert('Error', 'Failed to process payment');
-    } finally {
       setProcessing(false);
     }
   };
@@ -331,7 +279,7 @@ export default function WalletScreen() {
           ]}
         >
           <Ionicons
-            name={isCredit ? 'arrow-down' : 'arrow-up' as IoniconName}
+            name={isCredit ? 'arrow-down' : 'arrow-up'}
             size={20}
             color={isCredit ? '#34C759' : '#FF3B30'}
           />
@@ -350,7 +298,7 @@ export default function WalletScreen() {
               { color: isCredit ? '#34C759' : '#FF3B30' },
             ]}
           >
-            {isCredit ? '+' : '-'}₹{transaction.amount}
+            {isCredit ? '+' : '-'}₹{transaction.amount.toLocaleString('en-IN')}
           </Text>
           {transaction.status === 'pending' && (
             <Text style={styles.pendingText}>Pending</Text>
@@ -425,7 +373,7 @@ export default function WalletScreen() {
           { icon: "card", color: "#34C759", bg: "#E6FFF0", text: "Withdraw" },
           { icon: "refresh", color: "#FF3B30", bg: "#FFE6E6", text: "Refresh", cb: loadTransactions }
         ].map(({ icon, color, bg, text, cb }) => (
-          <TouchableOpacity key={text} style={styles.quickAction} onPress={cb}>
+          <TouchableOpacity key={text} style={styles.quickAction} onPress={cb || (() => {})}>
             <View style={[styles.quickActionIcon, { backgroundColor: bg }]}>
               <Ionicons name={icon as IoniconName} size={24} color={color} />
             </View>
@@ -540,14 +488,9 @@ export default function WalletScreen() {
           </View>
         </View>
       </Modal>
-      {Platform.OS === 'web' && (
-        <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
-      )}
     </SafeAreaView>
   );
 }
-
-
 
 const styles = StyleSheet.create({
   container: {
@@ -569,7 +512,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingVertical: 40,
   },
   backButton: {
     width: 40,

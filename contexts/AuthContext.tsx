@@ -1,229 +1,177 @@
-import React, { createContext, useContext, useEffect, useState, useRef } from "react";
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  useRef,
+} from "react";
 import {
   onAuthStateChanged,
   signOut,
-  signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
-  GoogleAuthProvider,
-  signInWithCredential,
   PhoneAuthProvider,
-  RecaptchaVerifier,
-  signInWithPhoneNumber,
   signInWithCredential as signInWithPhoneCredential,
 } from "firebase/auth";
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc, deleteDoc } from "firebase/firestore";
 import { auth, db, app } from "../config/firebaseConfig";
 import { useRouter } from "expo-router";
-import * as Google from "expo-auth-session/providers/google";
-import * as WebBrowser from "expo-web-browser";
-import { Alert, Platform } from "react-native";
 
-WebBrowser.maybeCompleteAuthSession();
+type Role = "customer";
 
-declare global {
-  interface Window {
-    recaptchaVerifier?: RecaptchaVerifier;
-    confirmationResult?: any;
-  }
-}
+type CustomerDoc = {
+  name: string;
+  email: string;
+  phone: string;
+  role: Role;
+  createdAt: string;
+};
 
-const AuthContext = createContext<any>(null);
+type UserData = {
+  uid: string;
+} & CustomerDoc;
 
-export const AuthProvider = ({ children }: any) => {
+type AuthContextType = {
+  user: UserData | null;
+  loading: boolean;
+  sendOTP: (phoneNumber: string, verifier: any) => Promise<void>;
+  verifyOTP: (otp: string) => Promise<UserData>;
+  logout: () => Promise<void>;
+  deleteAccount: () => Promise<void>;
+  app: typeof app;
+  updateUser: (data: Partial<UserData>) => void;
+};
+
+const AuthContext = createContext<AuthContextType | null>(null);
+
+export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const router = useRouter();
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [verificationId, setVerificationId] = useState<string>("");
+  const [verificationId, setVerificationId] = useState<string | null>(null);
 
   const recaptchaVerifier = useRef<any>(null);
 
-  // Google Auth setup
-  const [request, response, promptAsync] = Google.useAuthRequest({
-    androidClientId: "1051125804819-5m993sk85bdcep4vrppenficu868f72s.apps.googleusercontent.com",
-    webClientId: "1051125804819-jgiuubo27g6rrr4ph8vd32f2fujn3i10.apps.googleusercontent.com",
-  });
-
-  // Listen for Auth state changes
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (firebaseUser) {
-        const customerRef = doc(db, "customers", firebaseUser.uid);
+      try {
+        if (firebaseUser) {
+          const customerRef = doc(db, "customers", firebaseUser.uid);
+          const customerSnap = await getDoc(customerRef);
 
-        const customerSnap = await getDoc(customerRef);
+          if (customerSnap.exists()) {
+            const data = customerSnap.data() as CustomerDoc;
+            const userData: UserData = {
+              uid: firebaseUser.uid,
+              ...data,
+            };
+            setUser(userData);
+          } else {
+            const newDoc: CustomerDoc = {
+              name: firebaseUser.displayName || "",
+              email: firebaseUser.email || "",
+              phone: firebaseUser.phoneNumber || "",
+              role: "customer",
+              createdAt: new Date().toISOString(),
+            };
+            await setDoc(customerRef, newDoc);
 
-        if (customerSnap.exists()) {
-          const userData = { uid: firebaseUser.uid, role: "customer", ...customerSnap.data() };
-          setUser(userData);
+            const userData: UserData = {
+              uid: firebaseUser.uid,
+              ...newDoc,
+            };
+            setUser(userData);
+          }
+
           router.replace("/customer");
         } else {
-          // Create default customer account if no data exists
-          await setDoc(doc(db, "customers", firebaseUser.uid), {
-            name: firebaseUser.displayName || "",
-            email: firebaseUser.email || "",
-            phone: firebaseUser.phoneNumber || "",
-            role: "customer",
-            createdAt: new Date().toISOString(),
-          });
-          const userData = { uid: firebaseUser.uid, role: "customer" };
-          setUser(userData);
-          router.replace("/customer");
+          setUser(null);
+          router.replace("/auth");
         }
-      } else {
-        setUser(null);
-        router.replace("/auth");
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     });
+
     return unsubscribe;
   }, []);
 
-  const register = async ({ name, email, password, phone }: any) => {
-    const userCred = await createUserWithEmailAndPassword(auth, email, password);
-    const uid = userCred.user.uid;
-    await setDoc(doc(db, "customers", uid), {
-      name,
-      email,
-      phone,
-      role: "customer",
-      createdAt: new Date().toISOString(),
-    });
-  };
-
-  const login = async (email: string, password: string) => {
-    const userCredential = await signInWithEmailAndPassword(auth, email, password);
-    const uid = userCredential.user.uid;
-
-    // Only allow customer login
-    const customerDoc = await getDoc(doc(db, 'customers', uid));
-    if (customerDoc.exists()) {
-      const userData = { uid, ...customerDoc.data(), role: 'customer' };
-      setUser(userData);
-      return userData;
-    }
-
-    throw new Error('User data not found in database');
-  };
-
-  const googleLogin = async () => {
-    try {
-      const result = await promptAsync();
-      if (result?.type === "success") {
-        const { id_token } = result.params;
-        const credential = GoogleAuthProvider.credential(id_token);
-        await signInWithCredential(auth, credential);
-      } else {
-        Alert.alert("Google Sign-in cancelled");
-      }
-    } catch (e: any) {
-      Alert.alert("Error", e.message);
-    }
-  };
-
-  // SEND OTP - UNIVERSAL (Web + Mobile)
-  const sendOTP = async (phoneNumber: string) => {
+  const sendOTP: AuthContextType["sendOTP"] = async (phoneNumber, verifier) => {
     if (!phoneNumber.startsWith("+")) {
       throw new Error("Use international format +91XXXXXXXXXX");
     }
-
-    try {
-      if (Platform.OS === "web") {
-        if (!window.recaptchaVerifier) {
-          window.recaptchaVerifier = new RecaptchaVerifier(
-            auth,
-            "recaptcha-container",
-            {
-              size: "invisible",
-              callback: () => console.log("✅ reCAPTCHA solved"),
-              "expired-callback": () => console.log("❌ reCAPTCHA expired")
-            }
-          );
-        }
-        const confirmation = await signInWithPhoneNumber(
-          auth,
-          phoneNumber,
-          window.recaptchaVerifier
-        );
-        window.confirmationResult = confirmation;
-        console.log("✅ OTP sent (web)");
-      } else {
-        if (!recaptchaVerifier.current) {
-          throw new Error("reCAPTCHA verifier not initialized");
-        }
-        const phoneProvider = new PhoneAuthProvider(auth);
-        const verId = await phoneProvider.verifyPhoneNumber(
-          phoneNumber,
-          recaptchaVerifier.current
-        );
-        setVerificationId(verId);
-        console.log("✅ OTP sent (mobile)", verId);
-      }
-    } catch (error: any) {
-      console.error("❌ Error sending OTP:", error);
-      throw error;
+    if (!verifier) {
+      throw new Error("reCAPTCHA verifier not initialized");
     }
+
+    const phoneProvider = new PhoneAuthProvider(auth);
+    const verId = await phoneProvider.verifyPhoneNumber(phoneNumber, verifier);
+    setVerificationId(verId);
+    console.log("✅ OTP sent", verId);
   };
 
-  const verifyOTP = async (otp: string) => {
-    try {
-      let result;
+  const verifyOTP: AuthContextType["verifyOTP"] = async (otp) => {
+    if (!verificationId) {
+      throw new Error("Please request OTP first");
+    }
+    if (!otp || otp.length !== 6) {
+      throw new Error("Invalid OTP format");
+    }
 
-      if (Platform.OS === "web") {
-        if (!window.confirmationResult) {
-          throw new Error("Please request OTP first");
-        }
-        result = await window.confirmationResult.confirm(otp);
-        console.log("✅ Verified (web)", result.user.uid);
-      } else {
-        if (!verificationId) {
-          throw new Error("Please request OTP first");
-        }
-        const cred = PhoneAuthProvider.credential(verificationId, otp);
-        result = await signInWithPhoneCredential(auth, cred);
-        setVerificationId("");
-        console.log("✅ Verified (mobile)", result.user.uid);
-      }
+    try {
+      const cred = PhoneAuthProvider.credential(verificationId, otp);
+      const result = await signInWithPhoneCredential(auth, cred);
+
+      setVerificationId(null);
 
       const uid = result.user.uid;
-      // Only allow/recreate customer role
       const customerRef = doc(db, "customers", uid);
-
       const customerSnap = await getDoc(customerRef);
 
       if (customerSnap.exists()) {
-        const userData = { uid, ...customerSnap.data(), role: 'customer' };
+        const data = customerSnap.data() as CustomerDoc;
+        const userData: UserData = { uid, ...data };
         setUser(userData);
         return userData;
       } else {
-        // Create new customer account if doesn't exist
-        await setDoc(customerRef, {
+        const newDoc: CustomerDoc = {
           name: result.user.displayName || "",
           email: result.user.email || "",
           phone: result.user.phoneNumber || "",
           role: "customer",
           createdAt: new Date().toISOString(),
-        });
-        const userData = { uid, role: "customer" };
+        };
+        await setDoc(customerRef, newDoc);
+        const userData: UserData = { uid, ...newDoc };
         setUser(userData);
         return userData;
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error("❌ Error verifying OTP:", error);
       throw error;
     }
   };
 
-  const logout = async () => {
+  const logout: AuthContextType["logout"] = async () => {
     await signOut(auth);
     setUser(null);
-    setVerificationId("");
-
-    if (Platform.OS === "web" && window.recaptchaVerifier) {
-      window.recaptchaVerifier.clear();
-      window.recaptchaVerifier = undefined;
-      window.confirmationResult = undefined;
-    }
-
+    setVerificationId(null);
     router.replace("/auth");
+  };
+
+  const deleteAccount: AuthContextType["deleteAccount"] = async () => {
+    if (!auth.currentUser) {
+      throw new Error("No authenticated user");
+    }
+    const uid = auth.currentUser.uid;
+
+    await deleteDoc(doc(db, "customers", uid));
+    await auth.currentUser.delete();
+    setUser(null);
+    setVerificationId(null);
+    router.replace("/auth");
+  };
+
+  const updateUser = (data: Partial<UserData>) => {
+    setUser((prev) => (prev ? { ...prev, ...data } : prev));
   };
 
   return (
@@ -231,14 +179,12 @@ export const AuthProvider = ({ children }: any) => {
       value={{
         user,
         loading,
-        register,
-        login,
-        googleLogin,
-        logout,
         sendOTP,
         verifyOTP,
-        recaptchaVerifier,
+        logout,
+        deleteAccount,
         app,
+        updateUser,
       }}
     >
       {children}

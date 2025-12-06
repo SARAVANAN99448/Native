@@ -167,7 +167,7 @@ export default function AddressesScreen() {
           userId: user.uid,
           createdAt: Timestamp.now(),
         });
-        Alert.alert('Success', 'Address added successfully');
+
       }
       setShowAddModal(false);
       resetForm();
@@ -468,7 +468,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingVertical: 40,
     backgroundColor: '#fff',
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',

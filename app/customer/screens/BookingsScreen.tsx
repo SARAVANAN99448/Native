@@ -1,15 +1,29 @@
 import React, { useState, useEffect } from 'react';
 import {
-  View, Text, StyleSheet, SafeAreaView, ScrollView,
-  TouchableOpacity, Alert, ActivityIndicator,
+  View,
+  Text,
+  StyleSheet,
+  SafeAreaView,
+  ScrollView,
+  TouchableOpacity,
+  Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../../contexts/AuthContext';
 import {
-  collection, query, where, orderBy, getDocs,
-  updateDoc, doc, Timestamp, addDoc
+  collection,
+  query,
+  where,
+  orderBy,
+  getDocs,
+  updateDoc,
+  doc,
+  Timestamp,
+  addDoc,
 } from 'firebase/firestore';
 import { db } from '../../../config/firebaseConfig';
+import { useRouter } from 'expo-router';
 
 type Booking = {
   id: string;
@@ -22,16 +36,22 @@ type Booking = {
   status: string;
   totalAmount: number;
   address: {
+    street?: string;
     city: string;
     state: string;
+    pincode?: string;
   };
 };
 
 export default function BookingsScreen() {
   const { user } = useAuth();
+  const router = useRouter();
+
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'upcoming' | 'completed' | 'cancelled'>('upcoming');
+  const [activeTab, setActiveTab] = useState<'upcoming' | 'completed' | 'cancelled'>(
+    'upcoming'
+  );
 
   useEffect(() => {
     if (user?.uid) {
@@ -53,10 +73,10 @@ export default function BookingsScreen() {
 
       const snapshot = await getDocs(q);
       const bookingsData: Booking[] = [];
-      snapshot.forEach((doc) => {
+      snapshot.forEach(d => {
         bookingsData.push({
-          id: doc.id,
-          ...doc.data(),
+          id: d.id,
+          ...d.data(),
         } as Booking);
       });
 
@@ -69,51 +89,45 @@ export default function BookingsScreen() {
     }
   };
 
-  // ✅ Send notification to technician when cancelling
   const handleCancelBooking = async (booking: Booking) => {
-    Alert.alert(
-      'Cancel Booking',
-      'Are you sure you want to cancel this booking?',
-      [
-        { text: 'No', style: 'cancel' },
-        {
-          text: 'Yes, Cancel',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              const bookingRef = doc(db, 'bookings', booking.id);
-              await updateDoc(bookingRef, {
-                status: 'cancelled',
-                updatedAt: Timestamp.now(),
+    Alert.alert('Cancel Booking', 'Are you sure you want to cancel this booking?', [
+      { text: 'No', style: 'cancel' },
+      {
+        text: 'Yes, Cancel',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            const bookingRef = doc(db, 'bookings', booking.id);
+            await updateDoc(bookingRef, {
+              status: 'cancelled',
+              updatedAt: Timestamp.now(),
+            });
+
+            if (booking.providerId) {
+              await addDoc(collection(db, 'notifications'), {
+                userId: booking.providerId,
+                title: 'Booking Cancelled',
+                message: `Customer cancelled: ${booking.serviceName} scheduled for ${booking.scheduledDate} at ${booking.scheduledTime}`,
+                type: 'booking_cancelled',
+                bookingId: booking.id,
+                isRead: false,
+                createdAt: Timestamp.now(),
               });
-
-              // ✅ If technician was assigned, notify them
-              if (booking.providerId) {
-                await addDoc(collection(db, 'notifications'), {
-                  userId: booking.providerId,
-                  title: 'Booking Cancelled',
-                  message: `Customer cancelled: ${booking.serviceName} scheduled for ${booking.scheduledDate} at ${booking.scheduledTime}`,
-                  type: 'booking_cancelled',
-                  bookingId: booking.id,
-                  isRead: false,
-                  createdAt: Timestamp.now(),
-                });
-              }
-
-              Alert.alert('Success', 'Booking cancelled successfully');
-              loadBookings();
-            } catch (error) {
-              console.error('Error cancelling booking:', error);
-              Alert.alert('Error', 'Failed to cancel booking');
             }
-          },
+
+            Alert.alert('Success', 'Booking cancelled successfully');
+            loadBookings();
+          } catch (error) {
+            console.error('Error cancelling booking:', error);
+            Alert.alert('Error', 'Failed to cancel booking');
+          }
         },
-      ]
-    );
+      },
+    ]);
   };
 
   const filterBookings = () => {
-    return bookings.filter((booking) => {
+    return bookings.filter(booking => {
       if (activeTab === 'upcoming') {
         return ['pending', 'confirmed', 'in_progress'].includes(booking.status);
       }
@@ -129,23 +143,35 @@ export default function BookingsScreen() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'pending': return '#FF9500';
-      case 'confirmed': return '#007AFF';
-      case 'in_progress': return '#5856D6';
-      case 'completed': return '#34C759';
-      case 'cancelled': return '#FF3B30';
-      default: return '#999';
+      case 'pending':
+        return '#FF9500';
+      case 'confirmed':
+        return '#007AFF';
+      case 'in_progress':
+        return '#5856D6';
+      case 'completed':
+        return '#34C759';
+      case 'cancelled':
+        return '#FF3B30';
+      default:
+        return '#999';
     }
   };
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'pending': return 'time-outline';
-      case 'confirmed': return 'checkmark-circle-outline';
-      case 'in_progress': return 'play-circle-outline';
-      case 'completed': return 'checkmark-done-circle-outline';
-      case 'cancelled': return 'close-circle-outline';
-      default: return 'help-circle-outline';
+      case 'pending':
+        return 'time-outline';
+      case 'confirmed':
+        return 'checkmark-circle-outline';
+      case 'in_progress':
+        return 'play-circle-outline';
+      case 'completed':
+        return 'checkmark-done-circle-outline';
+      case 'cancelled':
+        return 'close-circle-outline';
+      default:
+        return 'help-circle-outline';
     }
   };
 
@@ -163,27 +189,48 @@ export default function BookingsScreen() {
       <View style={styles.bookingHeader}>
         <View style={styles.serviceInfo}>
           <Text style={styles.serviceName}>{booking.serviceName}</Text>
-          <View style={[styles.statusBadge, { backgroundColor: getStatusColor(booking.status) + '20' }]}>
-            <Ionicons name={getStatusIcon(booking.status) as any} size={14} color={getStatusColor(booking.status)} />
+          <View
+            style={[
+              styles.statusBadge,
+              { backgroundColor: getStatusColor(booking.status) + '20' },
+            ]}
+          >
+            <Ionicons
+              name={getStatusIcon(booking.status) as any}
+              size={14}
+              color={getStatusColor(booking.status)}
+            />
             <Text style={[styles.statusText, { color: getStatusColor(booking.status) }]}>
-              {booking.status.charAt(0).toUpperCase() + booking.status.slice(1).replace('_', ' ')}
+              {booking.status
+                .charAt(0)
+                .toUpperCase() + booking.status.slice(1).replace('_', ' ')}
             </Text>
           </View>
         </View>
       </View>
 
       <View style={styles.bookingDetails}>
-        <View style={styles.detailRow}>
+        <View className="detailRow" style={styles.detailRow}>
           <Ionicons name="calendar-outline" size={16} color="#666" />
-          <Text style={styles.detailText}>{formatDate(booking.scheduledDate)} at {booking.scheduledTime}</Text>
-        </View>
-
-        <View style={styles.detailRow}>
-          <Ionicons name="location-outline" size={16} color="#666" />
           <Text style={styles.detailText}>
-            {booking.address.city}, {booking.address.state}
+            {formatDate(booking.scheduledDate)} at {booking.scheduledTime}
           </Text>
         </View>
+
+        {/* Address is now clickable to change/select address in booking flow */}
+        <TouchableOpacity
+          style={styles.detailRow}
+          onPress={() => {
+            router.push('/customer/screens/BookingModal');
+          }}
+        >
+          <Ionicons name="location-outline" size={16} color="#666" />
+          <Text style={styles.detailText}>
+            {booking.address.street
+              ? `${booking.address.street}, ${booking.address.city}, ${booking.address.state}`
+              : `${booking.address.city}, ${booking.address.state}`}
+          </Text>
+        </TouchableOpacity>
 
         {booking.providerName && (
           <View style={styles.detailRow}>
@@ -210,7 +257,9 @@ export default function BookingsScreen() {
 
         <TouchableOpacity
           style={styles.detailsButton}
-          onPress={() => Alert.alert('Booking Details', `Booking ID: ${booking.id}`)}
+          onPress={() =>
+            Alert.alert('Booking Details', `Booking ID: ${booking.id}`)
+          }
         >
           <Text style={styles.detailsButtonText}>View Details</Text>
         </TouchableOpacity>
@@ -242,7 +291,12 @@ export default function BookingsScreen() {
           style={[styles.tab, activeTab === 'upcoming' && styles.activeTab]}
           onPress={() => setActiveTab('upcoming')}
         >
-          <Text style={[styles.tabText, activeTab === 'upcoming' && styles.activeTabText]}>
+          <Text
+            style={[
+              styles.tabText,
+              activeTab === 'upcoming' && styles.activeTabText,
+            ]}
+          >
             Upcoming
           </Text>
         </TouchableOpacity>
@@ -250,7 +304,12 @@ export default function BookingsScreen() {
           style={[styles.tab, activeTab === 'completed' && styles.activeTab]}
           onPress={() => setActiveTab('completed')}
         >
-          <Text style={[styles.tabText, activeTab === 'completed' && styles.activeTabText]}>
+          <Text
+            style={[
+              styles.tabText,
+              activeTab === 'completed' && styles.activeTabText,
+            ]}
+          >
             Completed
           </Text>
         </TouchableOpacity>
@@ -258,7 +317,12 @@ export default function BookingsScreen() {
           style={[styles.tab, activeTab === 'cancelled' && styles.activeTab]}
           onPress={() => setActiveTab('cancelled')}
         >
-          <Text style={[styles.tabText, activeTab === 'cancelled' && styles.activeTabText]}>
+          <Text
+            style={[
+              styles.tabText,
+              activeTab === 'cancelled' && styles.activeTabText,
+            ]}
+          >
             Cancelled
           </Text>
         </TouchableOpacity>
@@ -282,7 +346,7 @@ export default function BookingsScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f8f9fa' },
   header: {
-    paddingVertical: 16,
+    paddingVertical: 40,
     paddingHorizontal: 20,
     backgroundColor: '#fff',
     borderBottomWidth: 1,
@@ -323,7 +387,13 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  serviceName: { fontSize: 18, fontWeight: '700', color: '#333', flex: 1, marginRight: 8 },
+  serviceName: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#333',
+    flex: 1,
+    marginRight: 8,
+  },
   statusBadge: {
     flexDirection: 'row',
     alignItems: 'center',

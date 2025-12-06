@@ -1,21 +1,36 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, SafeAreaView, ScrollView,
-  TouchableOpacity, Alert, ActivityIndicator, Image
+  View,
+  Text,
+  StyleSheet,
+  SafeAreaView,
+  ScrollView,
+  TouchableOpacity,
+  Alert,
+  ActivityIndicator,
+  Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../../contexts/AuthContext';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { collection, addDoc, getDocs, query, where, Timestamp } from 'firebase/firestore';
+import {
+  collection,
+  addDoc,
+  getDocs,
+  query,
+  where,
+  Timestamp,
+} from 'firebase/firestore';
 import { db } from '../../../config/firebaseConfig';
+import { useFocusEffect } from '@react-navigation/native';
 
 type Address = {
   id: string;
   label: string;
   name: string;
-  phone: string; 
+  phone: string;
   street: string;
   city: string;
   state: string;
@@ -47,8 +62,16 @@ export default function BookingModal() {
 
   useEffect(() => {
     loadServiceData();
-    loadAddresses();
   }, []);
+
+  // 🔁 Reload addresses every time this screen gains focus
+  useFocusEffect(
+    useCallback(() => {
+      if (user?.uid) {
+        loadAddresses();
+      }
+    }, [user?.uid])
+  );
 
   const loadServiceData = async () => {
     try {
@@ -76,12 +99,21 @@ export default function BookingModal() {
       const snapshot = await getDocs(q);
 
       const addressList: Address[] = [];
-      snapshot.forEach((doc) => {
-        addressList.push({ id: doc.id, ...doc.data() } as Address);
+      snapshot.forEach(d => {
+        addressList.push({ id: d.id, ...d.data() } as Address);
       });
+
       setAddresses(addressList);
-      if (addressList.length > 0) setSelectedAddress(addressList[0]);
-    } catch {}
+      if (addressList.length > 0) {
+        // Prefer default address if available
+        const defaultAddr = addressList.find(a => a.isDefault);
+        setSelectedAddress(defaultAddr || addressList[0]);
+      } else {
+        setSelectedAddress(null);
+      }
+    } catch {
+      // silent fail, keep existing state
+    }
   };
 
   const handleCreateBooking = async () => {
@@ -99,6 +131,7 @@ export default function BookingModal() {
       Alert.alert('Error', 'Service data not available');
       return;
     }
+
     setCreating(true);
     try {
       const bookingData = {
@@ -125,20 +158,16 @@ export default function BookingModal() {
 
       await addDoc(collection(db, 'bookings'), bookingData);
 
-      Alert.alert(
-        'Success!',
-        'Your booking has been created successfully!',
-        [
-          {
-            text: 'View Bookings',
-            onPress: () => router.replace('/customer/screens/BookingsScreen'),
-          },
-          {
-            text: 'Go Home',
-            onPress: () => router.replace('/customer'),
-          },
-        ]
-      );
+      Alert.alert('Success!', 'Your booking has been created successfully!', [
+        {
+          text: 'View Bookings',
+          onPress: () => router.replace('/customer/screens/BookingsScreen'),
+        },
+        {
+          text: 'Go Home',
+          onPress: () => router.replace('/customer'),
+        },
+      ]);
     } catch (error) {
       Alert.alert('Error', 'Failed to create booking. Please try again.');
     } finally {
@@ -155,9 +184,17 @@ export default function BookingModal() {
   };
 
   const timeSlots = [
-    '09:00 AM', '10:00 AM', '11:00 AM', '12:00 PM',
-    '01:00 PM', '02:00 PM', '03:00 PM', '04:00 PM',
-    '05:00 PM', '06:00 PM', '07:00 PM'
+    '09:00 AM',
+    '10:00 AM',
+    '11:00 AM',
+    '12:00 PM',
+    '01:00 PM',
+    '02:00 PM',
+    '03:00 PM',
+    '04:00 PM',
+    '05:00 PM',
+    '06:00 PM',
+    '07:00 PM',
   ];
 
   if (loading) {
@@ -201,7 +238,9 @@ export default function BookingModal() {
           <Image source={{ uri: service.image }} style={styles.serviceImage} />
           <View style={styles.serviceInfo}>
             <Text style={styles.serviceName}>{service.name}</Text>
-            <Text style={styles.serviceDescription} numberOfLines={2}>{service.description}</Text>
+            <Text style={styles.serviceDescription} numberOfLines={2}>
+              {service.description}
+            </Text>
             <View style={styles.serviceDetails}>
               <View style={styles.serviceDetailItem}>
                 <Ionicons name="cash-outline" size={20} color="#6C3FE4" />
@@ -239,11 +278,12 @@ export default function BookingModal() {
             />
           )}
         </View>
+
         {/* Time Selection */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Select Time</Text>
           <View style={styles.timeSlotContainer}>
-            {timeSlots.map((time) => (
+            {timeSlots.map(time => (
               <TouchableOpacity
                 key={time}
                 style={[
@@ -264,6 +304,7 @@ export default function BookingModal() {
             ))}
           </View>
         </View>
+
         {/* Address Selection */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Service Address</Text>
@@ -276,12 +317,13 @@ export default function BookingModal() {
               <Text style={styles.addAddressText}>Add Address</Text>
             </TouchableOpacity>
           ) : (
-            addresses.map((address) => (
+            addresses.map(address => (
               <TouchableOpacity
                 key={address.id}
                 style={[
                   styles.addressOption,
-                  selectedAddress?.id === address.id && styles.selectedAddressOption,
+                  selectedAddress?.id === address.id &&
+                    styles.selectedAddressOption,
                 ]}
                 onPress={() => setSelectedAddress(address)}
               >
@@ -292,7 +334,11 @@ export default function BookingModal() {
                   </Text>
                 </View>
                 {selectedAddress?.id === address.id && (
-                  <Ionicons name="checkmark-circle" size={24} color="#6C3FE4" />
+                  <Ionicons
+                    name="checkmark-circle"
+                    size={24}
+                    color="#6C3FE4"
+                  />
                 )}
               </TouchableOpacity>
             ))
@@ -307,7 +353,10 @@ export default function BookingModal() {
           <Text style={styles.totalAmount}>₹{service.price}</Text>
         </View>
         <TouchableOpacity
-          style={[styles.bookButton, (creating || !selectedAddress) && styles.bookButtonDisabled]}
+          style={[
+            styles.bookButton,
+            (creating || !selectedAddress) && styles.bookButtonDisabled,
+          ]}
           onPress={handleCreateBooking}
           disabled={creating || !selectedAddress}
         >
@@ -328,59 +377,135 @@ const styles = StyleSheet.create({
   loadingText: { marginTop: 16, fontSize: 16, color: '#666' },
   errorText: { fontSize: 16, color: '#FF3B30', marginBottom: 16 },
   backButton: {
-    backgroundColor: '#6C3FE4', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 8
+    backgroundColor: '#6C3FE4',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
   },
   backButtonText: { color: '#fff', fontSize: 15, fontWeight: '600' },
   header: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 20, paddingVertical: 16, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#f0f0f0'
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 40,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
   },
   headerTitle: { fontSize: 18, fontWeight: '700', color: '#333' },
   content: { flex: 1 },
   serviceCard: {
-    backgroundColor: '#fff', margin: 20, borderRadius: 16, overflow: 'hidden',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 3
+    backgroundColor: '#fff',
+    margin: 20,
+    borderRadius: 16,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
   },
   serviceImage: { width: '100%', height: 160 },
   serviceInfo: { padding: 16 },
-  serviceName: { fontSize: 18, fontWeight: '700', color: '#1A1A1A', marginBottom: 8 },
-  serviceDescription: { fontSize: 14, color: '#666', marginBottom: 12, lineHeight: 20 },
+  serviceName: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1A1A1A',
+    marginBottom: 8,
+  },
+  serviceDescription: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 12,
+    lineHeight: 20,
+  },
   serviceDetails: { flexDirection: 'row', gap: 24 },
   serviceDetailItem: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   servicePrice: { fontSize: 16, fontWeight: '700', color: '#6C3FE4' },
   serviceDuration: { fontSize: 14, color: '#666', fontWeight: '500' },
   section: { paddingHorizontal: 20, marginBottom: 24 },
-  sectionTitle: { fontSize: 16, fontWeight: '600', color: '#333', marginBottom: 12 },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 12,
+  },
   dateButton: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    padding: 16, borderRadius: 12, borderWidth: 1, borderColor: '#e0e0e0', backgroundColor: '#fff'
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    backgroundColor: '#fff',
   },
   dateButtonText: { flex: 1, fontSize: 15, color: '#333', marginLeft: 12 },
   timeSlotContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  timeSlot: { paddingVertical: 10, paddingHorizontal: 16, borderRadius: 8, borderWidth: 1, borderColor: '#e0e0e0', backgroundColor: '#fff' },
+  timeSlot: {
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    backgroundColor: '#fff',
+  },
   selectedTimeSlot: { backgroundColor: '#6C3FE4', borderColor: '#6C3FE4' },
   timeSlotText: { fontSize: 13, fontWeight: '500', color: '#666' },
   selectedTimeSlotText: { color: '#fff' },
   addAddressButton: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    padding: 20, borderRadius: 12, borderWidth: 2, borderColor: '#6C3FE4', borderStyle: 'dashed',
-    gap: 8, backgroundColor: '#fff'
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 20,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#6C3FE4',
+    borderStyle: 'dashed',
+    gap: 8,
+    backgroundColor: '#fff',
   },
   addAddressText: { fontSize: 15, fontWeight: '600', color: '#6C3FE4' },
   addressOption: {
-    flexDirection: 'row', alignItems: 'center', padding: 16, borderRadius: 12,
-    borderWidth: 1, borderColor: '#e0e0e0', backgroundColor: '#fff', marginBottom: 12
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    backgroundColor: '#fff',
+    marginBottom: 12,
   },
   selectedAddressOption: { borderColor: '#6C3FE4', backgroundColor: '#F0EBFF' },
   addressInfo: { flex: 1 },
-  addressLabel: { fontSize: 15, fontWeight: '600', color: '#333', marginBottom: 4 },
+  addressLabel: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 4,
+  },
   addressText: { fontSize: 13, color: '#666' },
-  footer: { backgroundColor: '#fff', paddingHorizontal: 20, paddingVertical: 16, borderTopWidth: 1, borderTopColor: '#f0f0f0' },
-  totalContainer: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  footer: {
+    backgroundColor: '#fff',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#f0f0f0',
+  },
+  totalContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
   totalLabel: { fontSize: 14, color: '#666' },
   totalAmount: { fontSize: 20, fontWeight: '700', color: '#1A1A1A' },
   bookButton: {
-    backgroundColor: '#6C3FE4', paddingVertical: 16, borderRadius: 12, alignItems: 'center'
+    backgroundColor: '#6C3FE4',
+    paddingVertical: 16,
+    borderRadius: 12,
+    alignItems: 'center',
   },
   bookButtonDisabled: { opacity: 0.6 },
   bookButtonText: { fontSize: 16, fontWeight: '700', color: '#fff' },

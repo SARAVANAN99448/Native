@@ -29,7 +29,6 @@ export const db = getFirestore(app);
 
 // Initialize Firebase Auth with React Native AsyncStorage persistence
 export const auth = initializeAuth(app, {
-  persistence: getReactNativePersistence(AsyncStorage),
 });
 
 // Export RecaptchaVerifier and signInWithPhoneNumber for phone auth usage

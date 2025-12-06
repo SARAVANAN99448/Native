@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -61,13 +61,15 @@ type Address = {
 
 export default function HomeScreen() {
   const { user } = useAuth();
+  console.log('HomeScreen user name:', user?.name);
+
   const [searchQuery, setSearchQuery] = useState('');
   const [services, setServices] = useState<Service[]>([]);
   const [filteredServices, setFilteredServices] = useState<Service[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [bannerImages, setBannerImages] = useState<BannerImage[]>([]);
   const [videos, setVideos] = useState<VideoItem[]>([]);
-  
+
   const [showLocationModal, setShowLocationModal] = useState(false);
   const [savedAddresses, setSavedAddresses] = useState<Address[]>([
     { id: '1', label: 'Home', address: 'MG Road, Bangalore', isDefault: true },
@@ -75,6 +77,10 @@ export default function HomeScreen() {
   ]);
   const [selectedAddress, setSelectedAddress] = useState(savedAddresses[0]);
   const [favorites, setFavorites] = useState<string[]>([]);
+
+  // Name prompt state + timer ref (correct type)
+  const [showNamePrompt, setShowNamePrompt] = useState(false);
+  const namePromptTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     loadData();
@@ -84,27 +90,55 @@ export default function HomeScreen() {
     filterServices();
   }, [searchQuery, selectedCategory, services]);
 
+  // Show popup for 3 seconds if user has no name
+  useEffect(() => {
+    if (user && !user.name?.trim()) {
+      setShowNamePrompt(true);
+
+      // clear previous timer if any
+      if (namePromptTimeoutRef.current) {
+        clearTimeout(namePromptTimeoutRef.current);
+      }
+
+      namePromptTimeoutRef.current = setTimeout(() => {
+        setShowNamePrompt(false);
+      }, 3000);
+
+      return () => {
+        if (namePromptTimeoutRef.current) {
+          clearTimeout(namePromptTimeoutRef.current);
+        }
+      };
+    } else {
+      setShowNamePrompt(false);
+    }
+  }, [user?.name]);
+
   const loadData = async () => {
     try {
       const bannerList: BannerImage[] = [
         {
           id: '1',
-          image: 'https://images.unsplash.com/photo-1621905251189-08b45d6a269e?w=900&h=500&fit=crop&q=80',
+          image:
+            'https://images.unsplash.com/photo-1621905251189-08b45d6a269e?w=900&h=500&fit=crop&q=80',
           title: 'Summer Sale',
         },
         {
           id: '2',
-          image: 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=900&h=500&fit=crop&q=80',
+          image:
+            'https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=900&h=500&fit=crop&q=80',
           title: 'Deep Cleaning Offer',
         },
         {
           id: '3',
-          image: 'https://images.unsplash.com/photo-1560066984-138dadb4c035?w=900&h=500&fit=crop&q=80',
+          image:
+            'https://images.unsplash.com/photo-1560066984-138dadb4c035?w=900&h=500&fit=crop&q=80',
           title: 'Beauty Services',
         },
         {
           id: '4',
-          image: 'https://images.unsplash.com/photo-1635274853671-e5ce921b5264?w=900&h=500&fit=crop&q=80',
+          image:
+            'https://images.unsplash.com/photo-1635274853671-e5ce921b5264?w=900&h=500&fit=crop&q=80',
           title: 'AC Service Deal',
         },
       ];
@@ -112,31 +146,36 @@ export default function HomeScreen() {
       const videoList: VideoItem[] = [
         {
           id: '1',
-          thumbnail: 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=400&h=600&fit=crop&q=80',
+          thumbnail:
+            'https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=400&h=600&fit=crop&q=80',
           title: 'How We Clean Your Home',
           duration: '2:30',
         },
         {
           id: '2',
-          thumbnail: 'https://images.unsplash.com/photo-1560066984-138dadb4c035?w=400&h=600&fit=crop&q=80',
+          thumbnail:
+            'https://images.unsplash.com/photo-1560066984-138dadb4c035?w=400&h=600&fit=crop&q=80',
           title: 'Salon Services at Home',
           duration: '1:45',
         },
         {
           id: '3',
-          thumbnail: 'https://images.unsplash.com/photo-1621905251189-08b45d6a269e?w=400&h=600&fit=crop&q=80',
+          thumbnail:
+            'https://images.unsplash.com/photo-1621905251189-08b45d6a269e?w=400&h=600&fit=crop&q=80',
           title: 'AC Repair Guide',
           duration: '3:10',
         },
         {
           id: '4',
-          thumbnail: 'https://images.unsplash.com/photo-1621905252507-b35492cc74b4?w=400&h=600&fit=crop&q=80',
+          thumbnail:
+            'https://images.unsplash.com/photo-1621905252507-b35492cc74b4?w=400&h=600&fit=crop&q=80',
           title: 'Safety Tips & Guidelines',
           duration: '2:15',
         },
         {
           id: '5',
-          thumbnail: 'https://images.unsplash.com/photo-1607472586893-edb57bdc0e39?w=400&h=600&fit=crop&q=80',
+          thumbnail:
+            'https://images.unsplash.com/photo-1607472586893-edb57bdc0e39?w=400&h=600&fit=crop&q=80',
           title: 'Plumbing Solutions',
           duration: '1:55',
         },
@@ -152,35 +191,11 @@ export default function HomeScreen() {
           duration: 150,
           rating: 4.76,
           reviews: 470000,
-          image: 'https://images.unsplash.com/photo-1621905251189-08b45d6a269e?w=800&h=600&fit=crop&q=80',
+          image:
+            'https://images.unsplash.com/photo-1621905251189-08b45d6a269e?w=800&h=600&fit=crop&q=80',
           discount: 25,
           popular: true,
         },
-        // {
-        //   id: '2',
-        //   name: 'Home Deep Cleaning',
-        //   category: 'Cleaning',
-        //   description: 'Professional deep cleaning service for your entire home',
-        //   price: 1499,
-        //   duration: 180,
-        //   rating: 4.85,
-        //   reviews: 523000,
-        //   image: 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=800&h=600&fit=crop&q=80',
-        //   discount: 20,
-        //   popular: true,
-        // },
-        // {
-        //   id: '3',
-        //   name: 'Hair Cut & Styling',
-        //   category: 'Salon',
-        //   description: 'Professional haircut and styling at your doorstep',
-        //   price: 399,
-        //   duration: 45,
-        //   rating: 4.72,
-        //   reviews: 345000,
-        //   image: 'https://images.unsplash.com/photo-1560066984-138dadb4c035?w=800&h=600&fit=crop&q=80',
-        //   popular: false,
-        // },
       ];
 
       setBannerImages(bannerList);
@@ -203,7 +218,7 @@ export default function HomeScreen() {
       filtered = filtered.filter(service =>
         service.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         service.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        service.description.toLowerCase().includes(searchQuery.toLowerCase())
+        service.description.toLowerCase().includes(searchQuery.toLowerCase()),
       );
     }
 
@@ -218,8 +233,6 @@ export default function HomeScreen() {
     }
     return reviews.toString();
   };
-
-  // HANDLER FUNCTIONS
 
   const handleLocationPress = () => {
     setShowLocationModal(true);
@@ -246,24 +259,25 @@ export default function HomeScreen() {
     });
   };
 
-  // ✅ BOOK SERVICE WITH ASYNCSTORAGE
-const handleServicePress = async (service: Service) => {
-  try {
-    await AsyncStorage.setItem('selectedService', JSON.stringify({
-      id: service.id,
-      name: service.name,
-      price: service.price,
-      duration: service.duration,
-      description: service.description,
-      image: service.image,
-    }));
-    // Directly navigate to Booking screen/modal
-    router.push('/customer/screens/BookingModal');
-  } catch (error) {
-    console.error('Error storing service data:', error);
-    Alert.alert('Error', 'Failed to proceed with booking');
-  }
-};
+  const handleServicePress = async (service: Service) => {
+    try {
+      await AsyncStorage.setItem(
+        'selectedService',
+        JSON.stringify({
+          id: service.id,
+          name: service.name,
+          price: service.price,
+          duration: service.duration,
+          description: service.description,
+          image: service.image,
+        }),
+      );
+      router.push('/customer/screens/BookingModal');
+    } catch (error) {
+      console.error('Error storing service data:', error);
+      Alert.alert('Error', 'Failed to proceed with booking');
+    }
+  };
 
   const handleRepeatBooking = () => {
     router.push('/customer/screens/BookingsScreen');
@@ -283,6 +297,11 @@ const handleServicePress = async (service: Service) => {
 
   const handleNotificationsPress = () => {
     Alert.alert('Notifications', 'View your notifications');
+  };
+
+  const handleSetNamePress = () => {
+    setShowNamePrompt(false);
+    router.push('/customer/screens/ProfileScreen'); // adjust route if needed
   };
 
   const handleBannerPress = (banner: BannerImage) => {
@@ -305,13 +324,8 @@ const handleServicePress = async (service: Service) => {
     Alert.alert('All Services', 'Navigate to all services page');
   };
 
-  // RENDER FUNCTIONS
-
   const renderBannerItem = ({ item }: { item: BannerImage }) => (
-    <TouchableOpacity
-      style={styles.bannerItem}
-      activeOpacity={0.8}
-    >
+    <TouchableOpacity style={styles.bannerItem} activeOpacity={0.8} onPress={() => handleBannerPress(item)}>
       <Image source={{ uri: item.image }} style={styles.bannerImage} resizeMode="cover" />
       <View style={styles.bannerOverlay}>
         <Text style={styles.bannerTitle}>{item.title}</Text>
@@ -320,10 +334,7 @@ const handleServicePress = async (service: Service) => {
   );
 
   const renderVideoItem = ({ item }: { item: VideoItem }) => (
-    <TouchableOpacity
-      style={styles.videoItem}
-      activeOpacity={0.8}
-    >
+    <TouchableOpacity style={styles.videoItem} activeOpacity={0.8} onPress={() => handleVideoPress(item)}>
       <View style={styles.videoContainer}>
         <Image source={{ uri: item.thumbnail }} style={styles.videoThumbnail} resizeMode="cover" />
         <View style={styles.playButtonContainer}>
@@ -364,7 +375,7 @@ const handleServicePress = async (service: Service) => {
           )}
           <TouchableOpacity
             style={styles.favoriteButton}
-            onPress={(e) => {
+            onPress={e => {
               e.stopPropagation();
               toggleFavorite(item.id);
             }}
@@ -410,9 +421,9 @@ const handleServicePress = async (service: Service) => {
             </View>
           </View>
 
-          <TouchableOpacity 
-            style={styles.bookButton} 
-            onPress={(e) => {
+          <TouchableOpacity
+            style={styles.bookButton}
+            onPress={e => {
               e.stopPropagation();
               handleServicePress(item);
             }}
@@ -427,6 +438,22 @@ const handleServicePress = async (service: Service) => {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#fff" />
+
+      {/* Name Prompt Popup */}
+      {showNamePrompt && (
+        <View style={styles.namePromptContainer}>
+          <View style={styles.namePrompt}>
+            <Ionicons name="person-circle-outline" size={24} color="#6C3FE4" />
+            <Text style={styles.namePromptTitle}>Welcome!</Text>
+            <Text style={styles.namePromptText}>
+              Change your name in the Profile to personalize your experience
+            </Text>
+            <TouchableOpacity style={styles.namePromptButton} onPress={handleSetNamePress}>
+              <Text style={styles.namePromptButtonText}>Set Name Now</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
 
       {/* Header */}
       <View style={styles.header}>
@@ -478,7 +505,7 @@ const handleServicePress = async (service: Service) => {
         <View style={styles.quickActionsBar}>
           <TouchableOpacity style={styles.quickActionButton} onPress={handleRepeatBooking}>
             <Ionicons name="repeat" size={20} color="#6C3FE4" />
-            <Text style={styles.quickActionText}>Repeat Booking</Text>
+            <Text style={styles.quickActionText}>Repeat</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.quickActionButton} onPress={handleOffersPress}>
             <Ionicons name="gift" size={20} color="#FF3B30" />
@@ -496,7 +523,6 @@ const handleServicePress = async (service: Service) => {
             <Text style={styles.sectionTitle}>
               {selectedCategory ? `${selectedCategory} Services` : 'Popular Services'}
             </Text>
-            
           </View>
 
           <View style={styles.servicesContainer}>
@@ -516,7 +542,6 @@ const handleServicePress = async (service: Service) => {
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Special Offers</Text>
-            
           </View>
           <FlatList
             data={bannerImages}
@@ -535,7 +560,6 @@ const handleServicePress = async (service: Service) => {
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>How We Work</Text>
-            
           </View>
           <FlatList
             data={videos}
@@ -569,11 +593,7 @@ const handleServicePress = async (service: Service) => {
                 onPress={() => handleAddressSelect(address)}
               >
                 <View style={styles.addressIconContainer}>
-                  <Ionicons
-                    name={address.label === 'Home' ? 'home' : 'business'}
-                    size={20}
-                    color="#6C3FE4"
-                  />
+                  <Ionicons name={address.label === 'Home' ? 'home' : 'business'} size={20} color='#6C3FE4' />
                 </View>
                 <View style={styles.addressInfo}>
                   <Text style={styles.addressLabel}>{address.label}</Text>
@@ -604,12 +624,57 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingBottom: 24,
   },
+  namePromptContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 1000,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    padding: 20,
+  },
+  namePrompt: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 20,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  namePromptTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1A1A1A',
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  namePromptText: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 16,
+  },
+  namePromptButton: {
+    backgroundColor: '#6C3FE4',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 12,
+  },
+  namePromptButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
     paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingVertical: 40,
     backgroundColor: '#fff',
   },
   headerLeft: {
@@ -737,11 +802,6 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '700',
     color: '#1A1A1A',
-  },
-  seeAllText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#6C3FE4',
   },
   bannerListContainer: {
     paddingLeft: 20,

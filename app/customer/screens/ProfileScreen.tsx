@@ -18,9 +18,18 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../../../contexts/AuthContext';
 import { signOut } from 'firebase/auth';
-import { auth } from '../../../config/firebaseConfig';
+import { auth, db } from '../../../config/firebaseConfig';
 import { useRouter } from 'expo-router';
 import { ComponentProps } from 'react';
+import {
+  collection,
+  query,
+  where,
+  getDocs,
+  doc,
+  getDoc,
+  updateDoc,
+} from 'firebase/firestore';
 
 type IoniconName = ComponentProps<typeof Ionicons>['name'];
 
@@ -49,28 +58,32 @@ type MenuSection = {
 };
 
 export default function ProfileScreen() {
-  const { user } = useAuth();
+  const { user, deleteAccount, updateUser } = useAuth();
   const [loading, setLoading] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const router = useRouter();
 
   const [userStats, setUserStats] = useState<UserStats>({
-    totalBookings: 12,
-    totalSpent: 15420,
-    totalReviews: 8,
-    memberSince: 'Jan 2024',
+    totalBookings: 0,
+    totalSpent: 0,
+    totalReviews: 0,
+    memberSince: 'N/A',
   });
 
-  const [profileImage, setProfileImage] = useState<string | null>(user?.profilePhoto || null);
+  const [profileImage, setProfileImage] = useState<string | null>(
+    (user as any)?.profilePhoto || null
+  );
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editName, setEditName] = useState(user?.name || '');
   const [editEmail, setEditEmail] = useState(user?.email || '');
 
   useEffect(() => {
-    loadUserStats();
+    if (user?.uid) {
+      loadUserStats();
+    }
     requestPermissions();
-  }, []);
+  }, [user?.uid]);
 
   const requestPermissions = async () => {
     if (Platform.OS !== 'web') {
@@ -81,13 +94,60 @@ export default function ProfileScreen() {
     }
   };
 
-  const loadUserStats = () => {
-    setUserStats({
-      totalBookings: 12,
-      totalSpent: 15420,
-      totalReviews: 8,
-      memberSince: 'Jan 2024',
-    });
+  const loadUserStats = async () => {
+    if (!user?.uid) return;
+
+    try {
+      const userRef = doc(db, 'customers', user.uid);
+      const userSnap = await getDoc(userRef);
+
+      let memberSince = 'N/A';
+      if (userSnap.exists()) {
+        const data = userSnap.data() as any;
+        if (data.createdAt?.toDate) {
+          const d = data.createdAt.toDate();
+          memberSince = d.toLocaleString('default', {
+            month: 'short',
+            year: 'numeric',
+          });
+        } else if (typeof data.createdAt === 'string') {
+          const d = new Date(data.createdAt);
+          memberSince = d.toLocaleString('default', {
+            month: 'short',
+            year: 'numeric',
+          });
+        }
+      }
+
+      const bookingsRef = collection(db, 'bookings');
+      const bookingsQ = query(bookingsRef, where('customerId', '==', user.uid));
+      const bookingsSnap = await getDocs(bookingsQ);
+
+      let totalBookings = 0;
+      let totalSpent = 0;
+      bookingsSnap.forEach(docSnap => {
+        const data = docSnap.data() as any;
+        totalBookings += 1;
+        if (typeof data.totalAmount === 'number') {
+          totalSpent += data.totalAmount;
+        }
+      });
+
+      const reviewsRef = collection(db, 'reviews');
+      const reviewsQ = query(reviewsRef, where('customerId', '==', user.uid));
+      const reviewsSnap = await getDocs(reviewsQ);
+      const totalReviews = reviewsSnap.size;
+
+      setUserStats({
+        totalBookings,
+        totalSpent,
+        totalReviews,
+        memberSince,
+      });
+    } catch (error) {
+      console.error('Error loading user stats:', error);
+      Alert.alert('Error', 'Failed to load your stats');
+    }
   };
 
   const handleImageUpload = () => {
@@ -116,7 +176,7 @@ export default function ProfileScreen() {
       if (!result.canceled && result.assets[0]) {
         uploadProfileImage(result.assets[0].uri);
       }
-    } catch (error) {
+    } catch {
       Alert.alert('Error', 'Failed to open camera');
     }
   };
@@ -133,7 +193,7 @@ export default function ProfileScreen() {
       if (!result.canceled && result.assets[0]) {
         uploadProfileImage(result.assets[0].uri);
       }
-    } catch (error) {
+    } catch {
       Alert.alert('Error', 'Failed to open image library');
     }
   };
@@ -141,10 +201,11 @@ export default function ProfileScreen() {
   const uploadProfileImage = async (uri: string) => {
     setUploadingImage(true);
     try {
+      // TODO: upload to storage + save URL in Firestore
       await new Promise(resolve => setTimeout(resolve, 1000));
       setProfileImage(uri);
       Alert.alert('Success', 'Profile photo updated successfully!');
-    } catch (error) {
+    } catch {
       Alert.alert('Error', 'Failed to upload profile photo');
     } finally {
       setUploadingImage(false);
@@ -179,7 +240,7 @@ export default function ProfileScreen() {
               (window as any).recaptchaVerifier.clear();
             }
             router.replace('/auth');
-          } catch (error) {
+          } catch {
             Alert.alert('Error', 'Failed to logout');
           } finally {
             setLoading(false);
@@ -195,21 +256,54 @@ export default function ProfileScreen() {
     setShowEditModal(true);
   };
 
-  const handleSaveProfile = () => {
-    if (!editName.trim()) {
+  const handleSaveProfile = async () => {
+    if (!user?.uid) {
+      Alert.alert('Error', 'User not found');
+      return;
+    }
+
+    const trimmedName = editName.trim();
+    const trimmedEmail = editEmail.trim();
+
+    if (!trimmedName) {
       Alert.alert('Error', 'Name cannot be empty');
       return;
     }
-    Alert.alert('Success', 'Profile updated successfully');
-    setShowEditModal(false);
+
+    // simple optional email validation
+    if (trimmedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      Alert.alert('Invalid Email', 'Please enter a valid email address');
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      const userRef = doc(db, 'customers', user.uid);
+      await updateDoc(userRef, {
+        name: trimmedName,
+        email: trimmedEmail || '', // empty string if no email [web:155][web:182]
+      });
+
+      updateUser({
+        name: trimmedName,
+        email: trimmedEmail || '',
+      });
+
+      setShowEditModal(false);
+      Alert.alert('Success', 'Profile updated successfully!');
+    } catch (e) {
+      console.error('Profile save error:', e);
+      Alert.alert('Error', 'Failed to update profile');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  // ✅ Navigate to Address Management Screen
   const handleManageAddresses = () => {
     router.push('/customer/screens/AddressesScreen');
   };
 
-  // ✅ Navigate to Payment Methods Screen
   const handlePaymentMethods = () => {
     router.push('/customer/screens/PaymentMethodsScreen');
   };
@@ -229,11 +323,7 @@ export default function ProfileScreen() {
   const handleReferFriend = () => {
     Alert.alert(
       'Refer a Friend',
-      'Share your referral code: UC2024XYZ\n\nYour friend gets ₹200 off and you get ₹100 cashback!',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Share Code', onPress: () => Alert.alert('Shared', 'Referral code shared!') },
-      ]
+      'Share your referral code: UC2024XYZ\n\nYour friend gets ₹200 off and you get ₹100 cashback!'
     );
   };
 
@@ -265,13 +355,24 @@ export default function ProfileScreen() {
         {
           text: 'Delete',
           style: 'destructive',
-          onPress: () => Alert.alert('Account Deleted', 'Your account has been deleted.'),
+          onPress: async () => {
+            try {
+              setLoading(true);
+              await deleteAccount();
+            } catch (error: any) {
+              Alert.alert(
+                'Error',
+                error?.message || 'Failed to delete account. Please try again.'
+              );
+            } finally {
+              setLoading(false);
+            }
+          },
         },
       ]
     );
   };
 
-  // ✅ REMOVED LANGUAGE SECTION
   const menuSections: MenuSection[] = [
     {
       title: 'Account',
@@ -378,7 +479,11 @@ export default function ProfileScreen() {
           id: 14,
           title: 'About',
           icon: 'information-circle-outline',
-          action: () => Alert.alert('About', 'Vint Services v1.0.0\nMember since: ' + userStats.memberSince),
+          action: () =>
+            Alert.alert(
+              'About',
+              'Vint Services v1.0.0\nMember since: ' + userStats.memberSince
+            ),
         },
       ],
     },
@@ -400,8 +505,8 @@ export default function ProfileScreen() {
                   <Ionicons name="person" size={40} color="#fff" />
                 </View>
               )}
-              <TouchableOpacity 
-                style={styles.cameraButton} 
+              <TouchableOpacity
+                style={styles.cameraButton}
                 onPress={handleImageUpload}
                 disabled={uploadingImage}
               >
@@ -414,7 +519,7 @@ export default function ProfileScreen() {
             </View>
             <View style={styles.userInfo}>
               <Text style={styles.userName}>{user?.name || 'User'}</Text>
-              <Text style={styles.userEmail}>{user?.email}</Text>
+              <Text style={styles.userEmail}>{user?.email || 'No email set'}</Text>
               <View style={styles.roleContainer}>
                 <Ionicons name="checkmark-circle" size={14} color="#007AFF" />
                 <Text style={styles.roleText}>Verified Customer</Text>
@@ -433,12 +538,20 @@ export default function ProfileScreen() {
             <Text style={styles.statLabel}>Bookings</Text>
           </TouchableOpacity>
           <View style={styles.statDivider} />
-          <TouchableOpacity style={styles.statItem} onPress={() => Alert.alert('Spent', 'View spending history')}>
-            <Text style={styles.statNumber}>₹{userStats.totalSpent.toLocaleString()}</Text>
+          <TouchableOpacity
+            style={styles.statItem}
+            onPress={() => Alert.alert('Spent', 'View spending history')}
+          >
+            <Text style={styles.statNumber}>
+              ₹{userStats.totalSpent.toLocaleString()}
+            </Text>
             <Text style={styles.statLabel}>Spent</Text>
           </TouchableOpacity>
           <View style={styles.statDivider} />
-          <TouchableOpacity style={styles.statItem} onPress={() => Alert.alert('Reviews', 'View all reviews')}>
+          <TouchableOpacity
+            style={styles.statItem}
+            onPress={() => Alert.alert('Reviews', 'View all reviews')}
+          >
             <Text style={styles.statNumber}>{userStats.totalReviews}</Text>
             <Text style={styles.statLabel}>Reviews</Text>
           </TouchableOpacity>
@@ -464,7 +577,10 @@ export default function ProfileScreen() {
             </View>
             <Text style={styles.quickActionText}>Refer</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.quickAction} onPress={() => Alert.alert('Help', 'Customer support')}>
+          <TouchableOpacity
+            style={styles.quickAction}
+            onPress={() => Alert.alert('Help', 'Customer support')}
+          >
             <View style={styles.quickActionIcon}>
               <Ionicons name="headset" size={24} color="#FF3B30" />
             </View>
@@ -477,7 +593,7 @@ export default function ProfileScreen() {
           <View key={sectionIndex}>
             <Text style={styles.sectionTitle}>{section.title}</Text>
             <View style={styles.menuContainer}>
-              {section.items.map((item) => (
+              {section.items.map(item => (
                 <TouchableOpacity
                   key={item.id}
                   style={styles.menuItem}
@@ -489,7 +605,9 @@ export default function ProfileScreen() {
                     </View>
                     <View style={styles.menuTextContainer}>
                       <Text style={styles.menuItemText}>{item.title}</Text>
-                      {item.subtitle && <Text style={styles.menuItemSubtitle}>{item.subtitle}</Text>}
+                      {item.subtitle && (
+                        <Text style={styles.menuItemSubtitle}>{item.subtitle}</Text>
+                      )}
                     </View>
                   </View>
                   <View style={styles.menuItemRight}>
@@ -498,12 +616,15 @@ export default function ProfileScreen() {
                         <Text style={styles.badgeText}>{item.badge}</Text>
                       </View>
                     )}
-                    {item.hasSwitch && item.switchValue !== undefined && item.onSwitchToggle ? (
+                    {item.hasSwitch &&
+                    item.switchValue !== undefined &&
+                    item.onSwitchToggle ? (
                       <Switch
                         value={item.switchValue}
                         onValueChange={item.onSwitchToggle}
                         trackColor={{ false: '#ccc', true: '#007AFF' }}
-                        thumbColor="#fff" />
+                        thumbColor="#fff"
+                      />
                     ) : (
                       <Ionicons name="chevron-forward" size={20} color="#ccc" />
                     )}
@@ -521,9 +642,15 @@ export default function ProfileScreen() {
         </TouchableOpacity>
 
         {/* Logout Button */}
-        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout} disabled={loading}>
+        <TouchableOpacity
+          style={styles.logoutButton}
+          onPress={handleLogout}
+          disabled={loading}
+        >
           <Ionicons name="log-out-outline" size={24} color="#FF3B30" />
-          <Text style={styles.logoutText}>{loading ? 'Logging out...' : 'Logout'}</Text>
+          <Text style={styles.logoutText}>
+            {loading ? 'Logging out...' : 'Logout'}
+          </Text>
         </TouchableOpacity>
 
         {/* App Info */}
@@ -546,18 +673,19 @@ export default function ProfileScreen() {
             </View>
 
             <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>Name</Text>
+              <Text style={styles.inputLabel}>Name *</Text>
               <TextInput
                 style={styles.input}
                 value={editName}
                 onChangeText={setEditName}
                 placeholder="Enter your name"
                 placeholderTextColor="#999"
+                autoCapitalize="words"
               />
             </View>
 
             <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>Email</Text>
+              <Text style={styles.inputLabel}>Email (optional)</Text>
               <TextInput
                 style={styles.input}
                 value={editEmail}
@@ -565,13 +693,21 @@ export default function ProfileScreen() {
                 placeholder="Enter your email"
                 placeholderTextColor="#999"
                 keyboardType="email-address"
-                editable={false}
+                autoCapitalize="none"
               />
-              <Text style={styles.inputHint}>Email cannot be changed</Text>
+              <Text style={styles.inputHint}>You can update your email anytime</Text>
             </View>
 
-            <TouchableOpacity style={styles.saveButton} onPress={handleSaveProfile}>
-              <Text style={styles.saveButtonText}>Save Changes</Text>
+            <TouchableOpacity 
+              style={[styles.saveButton, loading && styles.saveButtonDisabled]} 
+              onPress={handleSaveProfile}
+              disabled={loading}
+            >
+              {loading ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.saveButtonText}>Save Changes</Text>
+              )}
             </TouchableOpacity>
           </View>
         </View>
@@ -580,10 +716,7 @@ export default function ProfileScreen() {
   );
 }
 
-
-// Styles remain the same as before
 const styles = StyleSheet.create({
-  // ... (keep all your existing styles)
   container: {
     flex: 1,
     backgroundColor: '#f8f9fa',
@@ -591,7 +724,7 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: '#fff',
     paddingHorizontal: 20,
-    paddingVertical: 24,
+    paddingVertical: 40,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -875,6 +1008,9 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
     marginTop: 8,
+  },
+  saveButtonDisabled: {
+    opacity: 0.6,
   },
   saveButtonText: {
     color: '#fff',
