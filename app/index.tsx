@@ -25,12 +25,6 @@ export default function Index() {
           case 'customer':
             router.replace('/customer');
             break;
-          case 'technician':
-            router.replace('/technician');
-            break;
-          case 'admin':
-            router.replace('/');
-            break;
           default:
             router.replace('/auth');
         }

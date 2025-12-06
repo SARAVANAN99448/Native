@@ -15,7 +15,6 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useAuth } from "../../contexts/AuthContext";
-import { FirebaseRecaptchaVerifierModal } from "expo-firebase-recaptcha";
 import { app } from "../../config/firebaseConfig";
 
 export default function AuthScreen() {
@@ -83,14 +82,6 @@ export default function AuthScreen() {
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
         >
-          {Platform.OS !== "web" && (
-            <FirebaseRecaptchaVerifierModal
-              ref={recaptchaVerifier}
-              firebaseConfig={app.options}
-              attemptInvisibleVerification
-            />
-          )}
-
           <View style={styles.header}>
             <Image
               style={styles.logo}

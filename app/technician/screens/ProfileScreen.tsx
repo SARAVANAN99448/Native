@@ -96,13 +96,13 @@ export default function ProfileScreen() {
         <View style={styles.header}>
           <View style={styles.profileSection}>
             <View style={styles.avatarContainer}>
-              {user?.profilePhoto ? (
+              {/* {user?.profilePhoto ? (
                 <Image source={{ uri: user.profilePhoto }} style={styles.avatar} />
               ) : (
                 <View style={styles.avatarPlaceholder}>
                   <Ionicons name="person" size={40} color="#fff" />
                 </View>
-              )}
+              )} */}
             </View>
             <View style={styles.userInfo}>
               <Text style={styles.userName}>{user?.name || 'Technician'}</Text>

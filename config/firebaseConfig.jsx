@@ -3,12 +3,11 @@ import { getFirestore } from "firebase/firestore";
 
 import {
   initializeAuth,
-  getReactNativePersistence,
   RecaptchaVerifier,
   signInWithPhoneNumber,
 } from "firebase/auth";
 
-import AsyncStorage from '@react-native-async-storage/async-storage';
+
 
 // Your Firebase config
 const firebaseConfig = {
@@ -28,8 +27,7 @@ export const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
 
 // Initialize Firebase Auth with React Native AsyncStorage persistence
-export const auth = initializeAuth(app, {
-});
+export const auth = initializeAuth(app);
 
 // Export RecaptchaVerifier and signInWithPhoneNumber for phone auth usage
 export { RecaptchaVerifier, signInWithPhoneNumber };

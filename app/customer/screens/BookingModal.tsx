@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -9,12 +9,12 @@ import {
   Alert,
   ActivityIndicator,
   Image,
-} from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import { useAuth } from '../../../contexts/AuthContext';
-import DateTimePicker from '@react-native-community/datetimepicker';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+} from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
+import { useAuth } from "../../../contexts/AuthContext";
+import DateTimePicker from "@react-native-community/datetimepicker";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   collection,
   addDoc,
@@ -22,9 +22,9 @@ import {
   query,
   where,
   Timestamp,
-} from 'firebase/firestore';
-import { db } from '../../../config/firebaseConfig';
-import { useFocusEffect } from '@react-navigation/native';
+} from "firebase/firestore";
+import { db } from "../../../config/firebaseConfig";
+import { useFocusEffect } from "@react-navigation/native";
 
 type Address = {
   id: string;
@@ -53,7 +53,7 @@ export default function BookingModal() {
 
   const [service, setService] = useState<ServiceData | null>(null);
   const [bookingDate, setBookingDate] = useState(new Date());
-  const [bookingTime, setBookingTime] = useState('10:00 AM');
+  const [bookingTime, setBookingTime] = useState("10:00 AM");
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [selectedAddress, setSelectedAddress] = useState<Address | null>(null);
@@ -64,7 +64,6 @@ export default function BookingModal() {
     loadServiceData();
   }, []);
 
-  // 🔁 Reload addresses every time this screen gains focus
   useFocusEffect(
     useCallback(() => {
       if (user?.uid) {
@@ -75,16 +74,16 @@ export default function BookingModal() {
 
   const loadServiceData = async () => {
     try {
-      const serviceData = await AsyncStorage.getItem('selectedService');
+      const serviceData = await AsyncStorage.getItem("selectedService");
       if (serviceData) {
         setService(JSON.parse(serviceData));
-        await AsyncStorage.removeItem('selectedService');
+        await AsyncStorage.removeItem("selectedService");
       } else {
-        Alert.alert('Error', 'No service selected');
+        Alert.alert("Error", "No service selected");
         router.back();
       }
     } catch {
-      Alert.alert('Error', 'Failed to load service data');
+      Alert.alert("Error", "Failed to load service data");
       router.back();
     } finally {
       setLoading(false);
@@ -94,41 +93,44 @@ export default function BookingModal() {
   const loadAddresses = async () => {
     if (!user?.uid) return;
     try {
-      const addressesRef = collection(db, 'addresses');
-      const q = query(addressesRef, where('userId', '==', user.uid));
+      const addressesRef = collection(db, "addresses");
+      const q = query(addressesRef, where("userId", "==", user.uid));
       const snapshot = await getDocs(q);
 
-      const addressList: Address[] = [];
+      const list: Address[] = [];
       snapshot.forEach(d => {
-        addressList.push({ id: d.id, ...d.data() } as Address);
+        list.push({ id: d.id, ...d.data() } as Address);
       });
 
-      setAddresses(addressList);
-      if (addressList.length > 0) {
-        // Prefer default address if available
-        const defaultAddr = addressList.find(a => a.isDefault);
-        setSelectedAddress(defaultAddr || addressList[0]);
+      setAddresses(list);
+      if (list.length > 0) {
+        const def = list.find(a => a.isDefault);
+        setSelectedAddress(def || list[0]);
       } else {
         setSelectedAddress(null);
       }
     } catch {
-      // silent fail, keep existing state
+      // keep existing state
     }
   };
 
   const handleCreateBooking = async () => {
     if (!selectedAddress) {
-      Alert.alert('Address Required', 'Please add an address first', [
+      Alert.alert("Address Required", "Please add an address first", [
         {
-          text: 'Add Address',
-          onPress: () => router.push('/customer/screens/AddressesScreen'),
+          text: "Add Address",
+          onPress: () => router.push("/customer/screens/AddressesScreen"),
         },
-        { text: 'Cancel', style: 'cancel' },
+        { text: "Cancel", style: "cancel" },
       ]);
       return;
     }
     if (!service) {
-      Alert.alert('Error', 'Service data not available');
+      Alert.alert("Error", "Service data not available");
+      return;
+    }
+    if (!user) {
+      Alert.alert("Not logged in", "Please sign in to create a booking.");
       return;
     }
 
@@ -138,12 +140,12 @@ export default function BookingModal() {
         serviceId: service.id,
         serviceName: service.name,
         customerId: user.uid,
-        customerName: user.name || 'Customer',
-        customerEmail: user.email || '',
-        customerPhone: user.phone || '',
-        scheduledDate: bookingDate.toISOString().split('T')[0],
+        customerName: user.name || "Customer",
+        customerEmail: user.email || "",
+        customerPhone: (user as any).phone || "",
+        scheduledDate: bookingDate.toISOString().split("T")[0],
         scheduledTime: bookingTime,
-        status: 'pending',
+        status: "pending",
         totalAmount: service.price,
         address: {
           street: selectedAddress.street,
@@ -156,45 +158,44 @@ export default function BookingModal() {
         providerName: null,
       };
 
-      await addDoc(collection(db, 'bookings'), bookingData);
+      await addDoc(collection(db, "bookings"), bookingData);
 
-      Alert.alert('Success!', 'Your booking has been created successfully!', [
+      Alert.alert("Success!", "Your booking has been created successfully!", [
         {
-          text: 'View Bookings',
-          onPress: () => router.replace('/customer/screens/BookingsScreen'),
+          text: "View Bookings",
+          onPress: () => router.replace("/customer/screens/BookingsScreen"),
         },
         {
-          text: 'Go Home',
-          onPress: () => router.replace('/customer'),
+          text: "Go Home",
+          onPress: () => router.replace("/customer"),
         },
       ]);
     } catch (error) {
-      Alert.alert('Error', 'Failed to create booking. Please try again.');
+      Alert.alert("Error", "Failed to create booking. Please try again.");
     } finally {
       setCreating(false);
     }
   };
 
-  const formatDate = (date: Date) => {
-    return date.toLocaleDateString('en-IN', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
+  const formatDate = (date: Date) =>
+    date.toLocaleDateString("en-IN", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
     });
-  };
 
   const timeSlots = [
-    '09:00 AM',
-    '10:00 AM',
-    '11:00 AM',
-    '12:00 PM',
-    '01:00 PM',
-    '02:00 PM',
-    '03:00 PM',
-    '04:00 PM',
-    '05:00 PM',
-    '06:00 PM',
-    '07:00 PM',
+    "09:00 AM",
+    "10:00 AM",
+    "11:00 AM",
+    "12:00 PM",
+    "01:00 PM",
+    "02:00 PM",
+    "03:00 PM",
+    "04:00 PM",
+    "05:00 PM",
+    "06:00 PM",
+    "07:00 PM",
   ];
 
   if (loading) {
@@ -311,7 +312,7 @@ export default function BookingModal() {
           {addresses.length === 0 ? (
             <TouchableOpacity
               style={styles.addAddressButton}
-              onPress={() => router.push('/customer/screens/AddressesScreen')}
+              onPress={() => router.push("/customer/screens/AddressesScreen")}
             >
               <Ionicons name="add-circle-outline" size={24} color="#6C3FE4" />
               <Text style={styles.addAddressText}>Add Address</Text>
@@ -372,141 +373,141 @@ export default function BookingModal() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8F9FD' },
-  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  loadingText: { marginTop: 16, fontSize: 16, color: '#666' },
-  errorText: { fontSize: 16, color: '#FF3B30', marginBottom: 16 },
+  container: { flex: 1, backgroundColor: "#F8F9FD" },
+  loadingContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
+  loadingText: { marginTop: 16, fontSize: 16, color: "#666" },
+  errorText: { fontSize: 16, color: "#FF3B30", marginBottom: 16 },
   backButton: {
-    backgroundColor: '#6C3FE4',
+    backgroundColor: "#6C3FE4",
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 8,
   },
-  backButtonText: { color: '#fff', fontSize: 15, fontWeight: '600' },
+  backButtonText: { color: "#fff", fontSize: 15, fontWeight: "600" },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingHorizontal: 20,
     paddingVertical: 40,
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: "#f0f0f0",
   },
-  headerTitle: { fontSize: 18, fontWeight: '700', color: '#333' },
+  headerTitle: { fontSize: 18, fontWeight: "700", color: "#333" },
   content: { flex: 1 },
   serviceCard: {
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     margin: 20,
     borderRadius: 16,
-    overflow: 'hidden',
-    shadowColor: '#000',
+    overflow: "hidden",
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 3,
   },
-  serviceImage: { width: '100%', height: 160 },
+  serviceImage: { width: "100%", height: 160 },
   serviceInfo: { padding: 16 },
   serviceName: {
     fontSize: 18,
-    fontWeight: '700',
-    color: '#1A1A1A',
+    fontWeight: "700",
+    color: "#1A1A1A",
     marginBottom: 8,
   },
   serviceDescription: {
     fontSize: 14,
-    color: '#666',
+    color: "#666",
     marginBottom: 12,
     lineHeight: 20,
   },
-  serviceDetails: { flexDirection: 'row', gap: 24 },
-  serviceDetailItem: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  servicePrice: { fontSize: 16, fontWeight: '700', color: '#6C3FE4' },
-  serviceDuration: { fontSize: 14, color: '#666', fontWeight: '500' },
+  serviceDetails: { flexDirection: "row", gap: 24 },
+  serviceDetailItem: { flexDirection: "row", alignItems: "center", gap: 8 },
+  servicePrice: { fontSize: 16, fontWeight: "700", color: "#6C3FE4" },
+  serviceDuration: { fontSize: 14, color: "#666", fontWeight: "500" },
   section: { paddingHorizontal: 20, marginBottom: 24 },
   sectionTitle: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
+    fontWeight: "600",
+    color: "#333",
     marginBottom: 12,
   },
   dateButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     padding: 16,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#e0e0e0',
-    backgroundColor: '#fff',
+    borderColor: "#e0e0e0",
+    backgroundColor: "#fff",
   },
-  dateButtonText: { flex: 1, fontSize: 15, color: '#333', marginLeft: 12 },
-  timeSlotContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  dateButtonText: { flex: 1, fontSize: 15, color: "#333", marginLeft: 12 },
+  timeSlotContainer: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
   timeSlot: {
     paddingVertical: 10,
     paddingHorizontal: 16,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#e0e0e0',
-    backgroundColor: '#fff',
+    borderColor: "#e0e0e0",
+    backgroundColor: "#fff",
   },
-  selectedTimeSlot: { backgroundColor: '#6C3FE4', borderColor: '#6C3FE4' },
-  timeSlotText: { fontSize: 13, fontWeight: '500', color: '#666' },
-  selectedTimeSlotText: { color: '#fff' },
+  selectedTimeSlot: { backgroundColor: "#6C3FE4", borderColor: "#6C3FE4" },
+  timeSlotText: { fontSize: 13, fontWeight: "500", color: "#666" },
+  selectedTimeSlotText: { color: "#fff" },
   addAddressButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     padding: 20,
     borderRadius: 12,
     borderWidth: 2,
-    borderColor: '#6C3FE4',
-    borderStyle: 'dashed',
+    borderColor: "#6C3FE4",
+    borderStyle: "dashed",
     gap: 8,
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
   },
-  addAddressText: { fontSize: 15, fontWeight: '600', color: '#6C3FE4' },
+  addAddressText: { fontSize: 15, fontWeight: "600", color: "#6C3FE4" },
   addressOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     padding: 16,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#e0e0e0',
-    backgroundColor: '#fff',
+    borderColor: "#e0e0e0",
+    backgroundColor: "#fff",
     marginBottom: 12,
   },
-  selectedAddressOption: { borderColor: '#6C3FE4', backgroundColor: '#F0EBFF' },
+  selectedAddressOption: { borderColor: "#6C3FE4", backgroundColor: "#F0EBFF" },
   addressInfo: { flex: 1 },
   addressLabel: {
     fontSize: 15,
-    fontWeight: '600',
-    color: '#333',
+    fontWeight: "600",
+    color: "#333",
     marginBottom: 4,
   },
-  addressText: { fontSize: 13, color: '#666' },
+  addressText: { fontSize: 13, color: "#666" },
   footer: {
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     paddingHorizontal: 20,
     paddingVertical: 16,
     borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
+    borderTopColor: "#f0f0f0",
   },
   totalContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: 12,
   },
-  totalLabel: { fontSize: 14, color: '#666' },
-  totalAmount: { fontSize: 20, fontWeight: '700', color: '#1A1A1A' },
+  totalLabel: { fontSize: 14, color: "#666" },
+  totalAmount: { fontSize: 20, fontWeight: "700", color: "#1A1A1A" },
   bookButton: {
-    backgroundColor: '#6C3FE4',
+    backgroundColor: "#6C3FE4",
     paddingVertical: 16,
     borderRadius: 12,
-    alignItems: 'center',
+    alignItems: "center",
   },
   bookButtonDisabled: { opacity: 0.6 },
-  bookButtonText: { fontSize: 16, fontWeight: '700', color: '#fff' },
+  bookButtonText: { fontSize: 16, fontWeight: "700", color: "#fff" },
 });
