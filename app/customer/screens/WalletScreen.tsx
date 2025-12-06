@@ -418,7 +418,7 @@ export default function WalletScreen() {
               <TextInput
                 style={styles.amountInput}
                 value={addAmount}
-                onChangeText={(text) => {
+                onChangeText={(text:string) => {
                   if (/^\d*$/.test(text)) {
                     setAddAmount(text);
                   }

@@ -102,7 +102,7 @@ export default function AuthScreen() {
                 style={styles.input}
                 placeholder="Phone (+91XXXXXXXXXX)"
                 value={phone}
-                onChangeText={(text) => {
+                onChangeText={(text:string) => {
                   let cleaned = text.replace(/[^\d]/g, "");
                   if (cleaned.startsWith("91")) cleaned = cleaned.slice(2);
                   cleaned = cleaned.slice(0, 10);

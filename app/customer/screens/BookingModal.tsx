@@ -272,7 +272,7 @@ export default function BookingModal() {
               mode="date"
               display="default"
               minimumDate={new Date()}
-              onChange={(event, selectedDate) => {
+              onChange={(event:any, selectedDate?: Date | undefined) => {
                 setShowDatePicker(false);
                 if (selectedDate) setBookingDate(selectedDate);
               }}

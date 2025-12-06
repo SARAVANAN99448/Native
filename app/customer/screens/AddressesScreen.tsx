@@ -253,8 +253,8 @@ export default function AddressesScreen() {
                       address.label === "Home"
                         ? "home"
                         : address.label === "Work"
-                        ? "business"
-                        : "location"
+                          ? "business"
+                          : "location"
                     }
                     size={20}
                     color="#007AFF"
@@ -352,7 +352,7 @@ export default function AddressesScreen() {
                 <TextInput
                   style={styles.input}
                   value={formData.name}
-                  onChangeText={text => setFormData({ ...formData, name: text })}
+                  onChangeText={(text: string) => setFormData({ ...formData, phone: text })}
                   placeholder="Enter full name"
                   placeholderTextColor="#999"
                 />
@@ -363,7 +363,7 @@ export default function AddressesScreen() {
                 <TextInput
                   style={styles.input}
                   value={formData.phone}
-                  onChangeText={text => setFormData({ ...formData, phone: text })}
+                  onChangeText={(text:string) => setFormData({ ...formData, phone: text })}
                   placeholder="Enter 10-digit phone number"
                   placeholderTextColor="#999"
                   keyboardType="phone-pad"
@@ -376,7 +376,7 @@ export default function AddressesScreen() {
                 <TextInput
                   style={[styles.input, styles.textArea]}
                   value={formData.street}
-                  onChangeText={text => setFormData({ ...formData, street: text })}
+                  onChangeText={(text:string) => setFormData({ ...formData, street: text })}
                   placeholder="House/Flat no., Building name, Street"
                   placeholderTextColor="#999"
                   multiline
@@ -390,7 +390,7 @@ export default function AddressesScreen() {
                   <TextInput
                     style={styles.input}
                     value={formData.city}
-                    onChangeText={text => setFormData({ ...formData, city: text })}
+                    onChangeText={(text:string) => setFormData({ ...formData, city: text })}
                     placeholder="City"
                     placeholderTextColor="#999"
                   />
@@ -401,7 +401,7 @@ export default function AddressesScreen() {
                   <TextInput
                     style={styles.input}
                     value={formData.pincode}
-                    onChangeText={text => setFormData({ ...formData, pincode: text })}
+                    onChangeText={(text:string) => setFormData({ ...formData, pincode: text })}
                     placeholder="6-digit pincode"
                     placeholderTextColor="#999"
                     keyboardType="number-pad"
@@ -415,7 +415,7 @@ export default function AddressesScreen() {
                 <TextInput
                   style={styles.input}
                   value={formData.state}
-                  onChangeText={text => setFormData({ ...formData, state: text })}
+                  onChangeText={(text:string) => setFormData({ ...formData, state: text })}
                   placeholder="State"
                   placeholderTextColor="#999"
                 />

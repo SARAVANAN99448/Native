@@ -473,7 +473,7 @@ export default function PaymentMethodsScreen() {
                     <TextInput
                       style={styles.input}
                       value={cardNumber}
-                      onChangeText={(text) => {
+                      onChangeText={(text:string) => {
                         const cleaned = text.replace(/\s/g, '');
                         if (/^\d*$/.test(cleaned) && cleaned.length <= 19) {
                           setCardNumber(formatCardNumber(cleaned));
@@ -504,7 +504,7 @@ export default function PaymentMethodsScreen() {
                       <TextInput
                         style={styles.input}
                         value={expiryMonth}
-                        onChangeText={(text) => {
+                        onChangeText={(text:string) => {
                           if (/^\d*$/.test(text) && text.length <= 2) {
                             setExpiryMonth(text);
                           }
@@ -521,7 +521,7 @@ export default function PaymentMethodsScreen() {
                       <TextInput
                         style={styles.input}
                         value={expiryYear}
-                        onChangeText={(text) => {
+                        onChangeText={(text:string) => {
                           if (/^\d*$/.test(text) && text.length <= 2) {
                             setExpiryYear(text);
                           }
@@ -538,7 +538,7 @@ export default function PaymentMethodsScreen() {
                       <TextInput
                         style={styles.input}
                         value={cvv}
-                        onChangeText={(text) => {
+                        onChangeText={(text:string) => {
                           if (/^\d*$/.test(text) && text.length <= 4) {
                             setCvv(text);
                           }
