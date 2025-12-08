@@ -14,8 +14,9 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { useRouter } from "expo-router";
-import { useAuth } from "../../contexts/AuthContext";
+import { FirebaseRecaptchaVerifierModal } from "expo-firebase-recaptcha";
 import { app } from "../../config/firebaseConfig";
+import { useAuth } from "../../contexts/AuthContext";
 
 export default function AuthScreen() {
   const [phone, setPhone] = useState("+91");
@@ -24,8 +25,8 @@ export default function AuthScreen() {
   const [loading, setLoading] = useState(false);
 
   const router = useRouter();
-  const { sendOTP, verifyOTP } = useAuth();
-  const recaptchaVerifier = useRef<any>(null);
+  const { sendOTP, verifyOTP, loading: authLoading } = useAuth();
+  const recaptchaVerifier = useRef<FirebaseRecaptchaVerifierModal | null>(null);
 
   const handlePhoneAuth = async () => {
     if (!/^\+91\d{10}$/.test(phone)) {
@@ -35,14 +36,15 @@ export default function AuthScreen() {
 
     if (!otpSent) {
       try {
+        if (!recaptchaVerifier.current) {
+          Alert.alert("Error", "reCAPTCHA verifier not ready");
+          return;
+        }
         setLoading(true);
-        await sendOTP(
-          phone,
-          Platform.OS === "web" ? undefined : recaptchaVerifier.current
-        );
+        await sendOTP(phone, recaptchaVerifier.current); // pass verifier
         setOtpSent(true);
-      } catch {
-        Alert.alert("Error", "Failed to send OTP");
+      } catch (error: any) {
+        Alert.alert("Error", error?.message || "Failed to send OTP");
       } finally {
         setLoading(false);
       }
@@ -56,8 +58,11 @@ export default function AuthScreen() {
         } else {
           Alert.alert("Error", "Invalid user role");
         }
-      } catch {
-        Alert.alert("Verification Failed", "Invalid or expired OTP. Try again.");
+      } catch (error: any) {
+        Alert.alert(
+          "Verification Failed",
+          error?.message || "Invalid or expired OTP. Try again."
+        );
       } finally {
         setLoading(false);
       }
@@ -74,6 +79,12 @@ export default function AuthScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* reCAPTCHA modal for Firebase web phone auth */}
+      <FirebaseRecaptchaVerifierModal
+        ref={recaptchaVerifier}
+        firebaseConfig={app.options}
+      />
+
       <KeyboardAvoidingView
         style={styles.container}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -102,7 +113,7 @@ export default function AuthScreen() {
                 style={styles.input}
                 placeholder="Phone (+91XXXXXXXXXX)"
                 value={phone}
-                onChangeText={(text:string) => {
+                onChangeText={(text: string) => {
                   let cleaned = text.replace(/[^\d]/g, "");
                   if (cleaned.startsWith("91")) cleaned = cleaned.slice(2);
                   cleaned = cleaned.slice(0, 10);
@@ -110,7 +121,7 @@ export default function AuthScreen() {
                 }}
                 keyboardType="phone-pad"
                 maxLength={13}
-                editable={!loading}
+                editable={!loading && !authLoading}
               />
             ) : (
               <>
@@ -127,7 +138,7 @@ export default function AuthScreen() {
                   onChangeText={handleOTPChange}
                   keyboardType="number-pad"
                   maxLength={6}
-                  editable={!loading}
+                  editable={!loading && !authLoading}
                   textContentType="oneTimeCode"
                   autoComplete="sms-otp"
                   autoFocus
@@ -136,9 +147,12 @@ export default function AuthScreen() {
             )}
 
             <TouchableOpacity
-              style={[styles.submitButton, loading && styles.submitButtonDisabled]}
+              style={[
+                styles.submitButton,
+                loading && styles.submitButtonDisabled,
+              ]}
               onPress={handlePhoneAuth}
-              disabled={loading}
+              disabled={loading || authLoading}
             >
               {loading ? (
                 <ActivityIndicator color="#fff" />
@@ -156,7 +170,7 @@ export default function AuthScreen() {
                   setOtpSent(false);
                   setOtp("");
                 }}
-                disabled={loading}
+                disabled={loading || authLoading}
               >
                 <Text style={styles.switchButtonText}>
                   ← Back to Phone Number

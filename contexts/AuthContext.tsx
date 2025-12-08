@@ -1,15 +1,9 @@
-import React, {
-  createContext,
-  useContext,
-  useEffect,
-  useState,
-  useRef,
-} from "react";
+import React, { createContext, useContext, useEffect, useState } from "react";
 import {
   onAuthStateChanged,
   signOut,
   PhoneAuthProvider,
-  signInWithCredential as signInWithPhoneCredential,
+  signInWithCredential,
 } from "firebase/auth";
 import { doc, getDoc, setDoc, deleteDoc } from "firebase/firestore";
 import { auth, db, app } from "../config/firebaseConfig";
@@ -47,8 +41,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(true);
   const [verificationId, setVerificationId] = useState<string | null>(null);
-
-  const recaptchaVerifier = useRef<any>(null);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
@@ -102,8 +94,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       throw new Error("reCAPTCHA verifier not initialized");
     }
 
-    const phoneProvider = new PhoneAuthProvider(auth);
-    const verId = await phoneProvider.verifyPhoneNumber(phoneNumber, verifier);
+    const provider = new PhoneAuthProvider(auth);
+    const verId = await provider.verifyPhoneNumber(phoneNumber, verifier);
     setVerificationId(verId);
     console.log("✅ OTP sent", verId);
   };
@@ -116,37 +108,32 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       throw new Error("Invalid OTP format");
     }
 
-    try {
-      const cred = PhoneAuthProvider.credential(verificationId, otp);
-      const result = await signInWithPhoneCredential(auth, cred);
+    const cred = PhoneAuthProvider.credential(verificationId, otp);
+    const result = await signInWithCredential(auth, cred);
 
-      setVerificationId(null);
+    setVerificationId(null);
 
-      const uid = result.user.uid;
-      const customerRef = doc(db, "customers", uid);
-      const customerSnap = await getDoc(customerRef);
+    const uid = result.user.uid;
+    const customerRef = doc(db, "customers", uid);
+    const customerSnap = await getDoc(customerRef);
 
-      if (customerSnap.exists()) {
-        const data = customerSnap.data() as CustomerDoc;
-        const userData: UserData = { uid, ...data };
-        setUser(userData);
-        return userData;
-      } else {
-        const newDoc: CustomerDoc = {
-          name: result.user.displayName || "",
-          email: result.user.email || "",
-          phone: result.user.phoneNumber || "",
-          role: "customer",
-          createdAt: new Date().toISOString(),
-        };
-        await setDoc(customerRef, newDoc);
-        const userData: UserData = { uid, ...newDoc };
-        setUser(userData);
-        return userData;
-      }
-    } catch (error) {
-      console.error("❌ Error verifying OTP:", error);
-      throw error;
+    if (customerSnap.exists()) {
+      const data = customerSnap.data() as CustomerDoc;
+      const userData: UserData = { uid, ...data };
+      setUser(userData);
+      return userData;
+    } else {
+      const newDoc: CustomerDoc = {
+        name: result.user.displayName || "",
+        email: result.user.email || "",
+        phone: result.user.phoneNumber || "",
+        role: "customer",
+        createdAt: new Date().toISOString(),
+      };
+      await setDoc(customerRef, newDoc);
+      const userData: UserData = { uid, ...newDoc };
+      setUser(userData);
+      return userData;
     }
   };
 

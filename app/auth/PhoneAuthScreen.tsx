@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import {
   View,
   TextInput,
@@ -7,8 +7,9 @@ import {
   Alert,
   StyleSheet,
   SafeAreaView,
-  Platform,
 } from "react-native";
+import { FirebaseRecaptchaVerifierModal } from "expo-firebase-recaptcha";
+import { app } from "../../config/firebaseConfig";
 import { useAuth } from "../../contexts/AuthContext";
 
 export default function PhoneAuthScreen() {
@@ -16,10 +17,11 @@ export default function PhoneAuthScreen() {
   const [otp, setOtp] = useState("");
   const [otpSent, setOtpSent] = useState(false);
 
+  const recaptchaVerifier = useRef<FirebaseRecaptchaVerifierModal | null>(null);
   const { sendOTP, verifyOTP, loading } = useAuth();
 
   const sendOTPHandler = async () => {
-    if (!phone.match(/^\+\d{10,}$/)) {
+    if (!/^\+91\d{10}$/.test(phone)) {
       Alert.alert(
         "Invalid phone number",
         "Please enter phone number in international format like +911234567890"
@@ -27,11 +29,18 @@ export default function PhoneAuthScreen() {
       return;
     }
     try {
-      await sendOTP(phone, Platform.OS === "web" ? undefined : null);
+      if (!recaptchaVerifier.current) {
+        Alert.alert("Error", "reCAPTCHA verifier not ready");
+        return;
+      }
+      await sendOTP(phone, recaptchaVerifier.current);
       setOtpSent(true);
       Alert.alert("OTP sent", "Check your phone for the verification code.");
     } catch (e: any) {
-      Alert.alert("Error sending OTP", e.message ?? "Failed to send OTP");
+      Alert.alert(
+        "Error sending OTP",
+        e?.message ?? "Failed to send OTP"
+      );
     }
   };
 
@@ -43,14 +52,22 @@ export default function PhoneAuthScreen() {
     try {
       await verifyOTP(otp);
       Alert.alert("Success", "Phone verified successfully!");
-      // navigate here if needed
     } catch (e: any) {
-      Alert.alert("Verification failed", e.message ?? "Invalid or expired OTP");
+      Alert.alert(
+        "Verification failed",
+        e?.message ?? "Invalid or expired OTP"
+      );
     }
   };
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* reCAPTCHA modal for Firebase web phone auth */}
+      <FirebaseRecaptchaVerifierModal
+        ref={recaptchaVerifier}
+        firebaseConfig={app.options}
+      />
+
       <View style={styles.innerContainer}>
         {!otpSent ? (
           <>
@@ -63,7 +80,11 @@ export default function PhoneAuthScreen() {
               value={phone}
               autoComplete="tel"
             />
-            <Button title="Send OTP" onPress={sendOTPHandler} disabled={loading} />
+            <Button
+              title="Send OTP"
+              onPress={sendOTPHandler}
+              disabled={loading}
+            />
           </>
         ) : (
           <>
