@@ -14,6 +14,22 @@
       },
       "oauth_client": [
         {
+          "client_id": "656074835735-71jcibcidlpns6kibpqra8936jegi94i.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "app.vint.app",
+            "certificate_hash": "95edd2efd1cc0687d2af0f38062c2c3fb28a02c7"
+          }
+        },
+        {
+          "client_id": "656074835735-qvia41jkn4fb0sfabve6qi93cdr01920.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "app.vint.app",
+            "certificate_hash": "a2cf3aaaea7546fa09aa2f91d006447d7fefb3fa"
+          }
+        },
+        {
           "client_id": "656074835735-2i31r5c89b7i4cer5hcoqcl9h45mj306.apps.googleusercontent.com",
           "client_type": 3
         }
@@ -29,6 +45,13 @@
             {
               "client_id": "656074835735-2i31r5c89b7i4cer5hcoqcl9h45mj306.apps.googleusercontent.com",
               "client_type": 3
+            },
+            {
+              "client_id": "656074835735-4vt72rgdg81v3tr3tipmuuht8fhnpq28.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "vint"
+              }
             }
           ]
         }

@@ -1,24 +1,24 @@
-import React, { useState, useRef } from "react";
+// screens/PhoneAuthScreen.tsx
+import React, { useState } from "react";
 import {
   View,
+  Text,
   TextInput,
   Button,
-  Text,
   Alert,
   StyleSheet,
   SafeAreaView,
+  ActivityIndicator,
 } from "react-native";
-import { FirebaseRecaptchaVerifierModal } from "expo-firebase-recaptcha";
-import { app } from "../../config/firebaseConfig";
 import { useAuth } from "../../contexts/AuthContext";
 
 export default function PhoneAuthScreen() {
   const [phone, setPhone] = useState("+91");
   const [otp, setOtp] = useState("");
   const [otpSent, setOtpSent] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  const recaptchaVerifier = useRef<FirebaseRecaptchaVerifierModal | null>(null);
-  const { sendOTP, verifyOTP, loading } = useAuth();
+  const { sendOTP, verifyOTP, loading: authLoading } = useAuth();
 
   const sendOTPHandler = async () => {
     if (!/^\+91\d{10}$/.test(phone)) {
@@ -28,12 +28,9 @@ export default function PhoneAuthScreen() {
       );
       return;
     }
+    setLoading(true);
     try {
-      if (!recaptchaVerifier.current) {
-        Alert.alert("Error", "reCAPTCHA verifier not ready");
-        return;
-      }
-      await sendOTP(phone, recaptchaVerifier.current);
+      await sendOTP(phone);
       setOtpSent(true);
       Alert.alert("OTP sent", "Check your phone for the verification code.");
     } catch (e: any) {
@@ -41,6 +38,8 @@ export default function PhoneAuthScreen() {
         "Error sending OTP",
         e?.message ?? "Failed to send OTP"
       );
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -49,6 +48,7 @@ export default function PhoneAuthScreen() {
       Alert.alert("Invalid OTP", "Please enter the 6-digit OTP");
       return;
     }
+    setLoading(true);
     try {
       await verifyOTP(otp);
       Alert.alert("Success", "Phone verified successfully!");
@@ -57,34 +57,36 @@ export default function PhoneAuthScreen() {
         "Verification failed",
         e?.message ?? "Invalid or expired OTP"
       );
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* reCAPTCHA modal for Firebase web phone auth */}
-      <FirebaseRecaptchaVerifierModal
-        ref={recaptchaVerifier}
-        firebaseConfig={app.options}
-      />
-
-      <View style={styles.innerContainer}>
+      <View style={styles.inner}>
         {!otpSent ? (
           <>
             <Text style={styles.title}>Enter your phone number</Text>
             <TextInput
               style={styles.input}
               placeholder="+91XXXXXXXXXX"
-              onChangeText={setPhone}
-              keyboardType="phone-pad"
               value={phone}
+              onChangeText={(text: string) => {
+                let cleaned = text.replace(/[^\d]/g, "");
+                if (cleaned.startsWith("91")) cleaned = cleaned.slice(2);
+                cleaned = cleaned.slice(0, 10);
+                setPhone("+91" + cleaned);
+              }}
+              keyboardType="phone-pad"
               autoComplete="tel"
+              maxLength={13}
             />
-            <Button
-              title="Send OTP"
-              onPress={sendOTPHandler}
-              disabled={loading}
-            />
+            {loading || authLoading ? (
+              <ActivityIndicator />
+            ) : (
+              <Button title="Send OTP" onPress={sendOTPHandler} />
+            )}
           </>
         ) : (
           <>
@@ -92,17 +94,29 @@ export default function PhoneAuthScreen() {
             <TextInput
               style={styles.input}
               placeholder="123456"
-              onChangeText={setOtp}
-              keyboardType="number-pad"
               value={otp}
+              onChangeText={(text: string) => {
+                const cleaned = text.replace(/\D/g, "");
+                setOtp(cleaned);
+              }}
+              keyboardType="number-pad"
               maxLength={6}
               autoComplete="sms-otp"
             />
-            <Button
-              title="Verify OTP"
-              onPress={verifyOTPHandler}
-              disabled={loading}
-            />
+            {loading || authLoading ? (
+              <ActivityIndicator />
+            ) : (
+              <Button title="Verify OTP" onPress={verifyOTPHandler} />
+            )}
+            <View style={{ marginTop: 16 }}>
+              <Button
+                title="Change phone number"
+                onPress={() => {
+                  setOtp("");
+                  setOtpSent(false);
+                }}
+              />
+            </View>
           </>
         )}
       </View>
@@ -112,7 +126,7 @@ export default function PhoneAuthScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, justifyContent: "center", backgroundColor: "#fff" },
-  innerContainer: { paddingHorizontal: 20 },
+  inner: { paddingHorizontal: 20 },
   title: {
     fontSize: 24,
     fontWeight: "bold",

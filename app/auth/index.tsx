@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -14,8 +14,6 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { useRouter } from "expo-router";
-import { FirebaseRecaptchaVerifierModal } from "expo-firebase-recaptcha";
-import { app } from "../../config/firebaseConfig";
 import { useAuth } from "../../contexts/AuthContext";
 
 export default function AuthScreen() {
@@ -26,7 +24,6 @@ export default function AuthScreen() {
 
   const router = useRouter();
   const { sendOTP, verifyOTP, loading: authLoading } = useAuth();
-  const recaptchaVerifier = useRef<FirebaseRecaptchaVerifierModal | null>(null);
 
   const handlePhoneAuth = async () => {
     if (!/^\+91\d{10}$/.test(phone)) {
@@ -36,13 +33,10 @@ export default function AuthScreen() {
 
     if (!otpSent) {
       try {
-        if (!recaptchaVerifier.current) {
-          Alert.alert("Error", "reCAPTCHA verifier not ready");
-          return;
-        }
         setLoading(true);
-        await sendOTP(phone, recaptchaVerifier.current); // pass verifier
+        await sendOTP(phone); // native auth().signInWithPhoneNumber inside context
         setOtpSent(true);
+        Alert.alert("OTP Sent", "Check your phone for the verification code.");
       } catch (error: any) {
         Alert.alert("Error", error?.message || "Failed to send OTP");
       } finally {
@@ -52,7 +46,7 @@ export default function AuthScreen() {
       if (otp.length !== 6) return;
       try {
         setLoading(true);
-        const userData = await verifyOTP(otp);
+        const userData = await verifyOTP(otp); // confirmation.confirm inside context
         if (userData.role === "customer") {
           router.replace("/customer");
         } else {
@@ -79,12 +73,6 @@ export default function AuthScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* reCAPTCHA modal for Firebase web phone auth */}
-      <FirebaseRecaptchaVerifierModal
-        ref={recaptchaVerifier}
-        firebaseConfig={app.options}
-      />
-
       <KeyboardAvoidingView
         style={styles.container}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -149,12 +137,12 @@ export default function AuthScreen() {
             <TouchableOpacity
               style={[
                 styles.submitButton,
-                loading && styles.submitButtonDisabled,
+                (loading || authLoading) && styles.submitButtonDisabled,
               ]}
               onPress={handlePhoneAuth}
               disabled={loading || authLoading}
             >
-              {loading ? (
+              {(loading || authLoading) ? (
                 <ActivityIndicator color="#fff" />
               ) : (
                 <Text style={styles.submitButtonText}>
@@ -183,7 +171,6 @@ export default function AuthScreen() {
     </SafeAreaView>
   );
 }
-
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#fff" },
   scrollContent: { flexGrow: 1, paddingBottom: 40 },
