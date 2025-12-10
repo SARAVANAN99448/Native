@@ -44,9 +44,36 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Confirmation handle from native auth
   const [confirmation, setConfirmation] =
     useState<FirebaseAuthTypes.ConfirmationResult | null>(null);
+
+  // Helper to load/create Firestore user from Firebase user
+  const loadOrCreateUser = async (
+    firebaseUser: FirebaseAuthTypes.User
+  ): Promise<UserData> => {
+    const uid = firebaseUser.uid;
+    const customerRef = doc(db, "customers", uid);
+    const snap = await getDoc(customerRef);
+
+    if (snap.exists()) {
+      const data = snap.data() as CustomerDoc;
+      const userData: UserData = { uid, ...data };
+      setUser(userData);
+      return userData;
+    } else {
+      const newDoc: CustomerDoc = {
+        name: firebaseUser.displayName || "",
+        email: firebaseUser.email || "",
+        phone: firebaseUser.phoneNumber || "",
+        role: "customer",
+        createdAt: new Date().toISOString(),
+      };
+      await setDoc(customerRef, newDoc);
+      const userData: UserData = { uid, ...newDoc };
+      setUser(userData);
+      return userData;
+    }
+  };
 
   useEffect(() => {
     setLoading(true);
@@ -54,29 +81,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       async (firebaseUser) => {
         try {
           if (firebaseUser) {
-            const customerRef = doc(db, "customers", firebaseUser.uid);
-            const snap = await getDoc(customerRef);
-
-            if (snap.exists()) {
-              const data = snap.data() as CustomerDoc;
-              const userData: UserData = { uid: firebaseUser.uid, ...data };
-              setUser(userData);
-            } else {
-              const newDoc: CustomerDoc = {
-                name: firebaseUser.displayName || "",
-                email: firebaseUser.email || "",
-                phone: firebaseUser.phoneNumber || "",
-                role: "customer",
-                createdAt: new Date().toISOString(),
-              };
-              await setDoc(customerRef, newDoc);
-              const userData: UserData = {
-                uid: firebaseUser.uid,
-                ...newDoc,
-              };
-              setUser(userData);
-            }
-
+            await loadOrCreateUser(firebaseUser);
             router.replace("/customer");
           } else {
             setUser(null);
@@ -106,49 +111,43 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const verifyOTP: AuthContextType["verifyOTP"] = async (otp) => {
-    if (!confirmation) {
-      throw new Error("Please request OTP first");
-    }
     if (!otp || otp.length !== 6) {
       throw new Error("Invalid OTP format");
     }
 
-    try {
-      const result = await confirmation.confirm(otp);
-      setConfirmation(null);
+    // If we have no confirmation, maybe auto-verified already
+    if (!confirmation) {
+      const current = authNative().currentUser;
+      if (current) {
+        return await loadOrCreateUser(current);
+      }
+      throw new Error("Please request OTP first");
+    }
 
-      const user = result?.user;
-      if (!user) {
+    try {
+      const res = await confirmation.confirm(otp);
+
+      if (!res || !res.user) {
         throw new Error("User not found after phone verification");
       }
 
-      const uid = user.uid;
-      const customerRef = doc(db, "customers", uid);
-      const snap = await getDoc(customerRef);
-
-      if (snap.exists()) {
-        const data = snap.data() as CustomerDoc;
-        const userData: UserData = { uid, ...data };
-        setUser(userData);
-        return userData;
-      } else {
-        const newDoc: CustomerDoc = {
-          name: user.displayName || "",
-          email: user.email || "",
-          phone: user.phoneNumber || "",
-          role: "customer",
-          createdAt: new Date().toISOString(),
-        };
-        await setDoc(customerRef, newDoc);
-        const userData: UserData = { uid, ...newDoc };
-        setUser(userData);
-        return userData;
-      }
+      const firebaseUser = res.user;
+      setConfirmation(null);
+      return await loadOrCreateUser(firebaseUser);
     } catch (e: any) {
       console.log("OTP verify error", e?.code, e?.message);
+
+      // Handle auto-verification case: session expired but user already signed in
+      if (e?.code === "auth/session-expired") {
+        const current = authNative().currentUser;
+        if (current) {
+          setConfirmation(null);
+          return await loadOrCreateUser(current);
+        }
+      }
+
       throw e;
     }
-
   };
 
   const logout: AuthContextType["logout"] = async () => {
