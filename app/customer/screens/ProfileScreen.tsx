@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -13,25 +13,16 @@ import {
   Modal,
   TextInput,
   ActivityIndicator,
-} from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import * as ImagePicker from 'expo-image-picker';
-import { useAuth } from '../../../contexts/AuthContext';
-import { signOut } from 'firebase/auth';
-import { auth, db } from '../../../config/firebaseConfig';
-import { useRouter } from 'expo-router';
-import { ComponentProps } from 'react';
-import {
-  collection,
-  query,
-  where,
-  getDocs,
-  doc,
-  getDoc,
-  updateDoc,
-} from 'firebase/firestore';
+} from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import * as ImagePicker from "expo-image-picker";
+import { useAuth } from "../../../contexts/AuthContext";
+import authNative from "@react-native-firebase/auth";
+import firestore from "@react-native-firebase/firestore";
+import { useRouter } from "expo-router";
+import { ComponentProps } from "react";
 
-type IoniconName = ComponentProps<typeof Ionicons>['name'];
+type IoniconName = ComponentProps<typeof Ionicons>["name"];
 
 type UserStats = {
   totalBookings: number;
@@ -67,7 +58,7 @@ export default function ProfileScreen() {
     totalBookings: 0,
     totalSpent: 0,
     totalReviews: 0,
-    memberSince: 'N/A',
+    memberSince: "N/A",
   });
 
   const [profileImage, setProfileImage] = useState<string | null>(
@@ -75,8 +66,8 @@ export default function ProfileScreen() {
   );
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [showEditModal, setShowEditModal] = useState(false);
-  const [editName, setEditName] = useState(user?.name || '');
-  const [editEmail, setEditEmail] = useState(user?.email || '');
+  const [editName, setEditName] = useState(user?.name || "");
+  const [editEmail, setEditEmail] = useState(user?.email || "");
 
   useEffect(() => {
     if (user?.uid) {
@@ -86,10 +77,14 @@ export default function ProfileScreen() {
   }, [user?.uid]);
 
   const requestPermissions = async () => {
-    if (Platform.OS !== 'web') {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('Permission Required', 'Please allow access to your photo library.');
+    if (Platform.OS !== "web") {
+      const { status } =
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert(
+          "Permission Required",
+          "Please allow access to your photo library."
+        );
       }
     }
   };
@@ -98,44 +93,46 @@ export default function ProfileScreen() {
     if (!user?.uid) return;
 
     try {
-      const userRef = doc(db, 'customers', user.uid);
-      const userSnap = await getDoc(userRef);
+      const userRef = firestore().collection("customers").doc(user.uid);
+      const userSnap = await userRef.get();
+      const data = userSnap.data() as any | undefined;
 
-      let memberSince = 'N/A';
-      if (userSnap.exists()) {
-        const data = userSnap.data() as any;
+      let memberSince = "N/A";
+      if (data) {
         if (data.createdAt?.toDate) {
           const d = data.createdAt.toDate();
-          memberSince = d.toLocaleString('default', {
-            month: 'short',
-            year: 'numeric',
+          memberSince = d.toLocaleString("default", {
+            month: "short",
+            year: "numeric",
           });
-        } else if (typeof data.createdAt === 'string') {
+        } else if (typeof data.createdAt === "string") {
           const d = new Date(data.createdAt);
-          memberSince = d.toLocaleString('default', {
-            month: 'short',
-            year: 'numeric',
+          memberSince = d.toLocaleString("default", {
+            month: "short",
+            year: "numeric",
           });
         }
       }
 
-      const bookingsRef = collection(db, 'bookings');
-      const bookingsQ = query(bookingsRef, where('customerId', '==', user.uid));
-      const bookingsSnap = await getDocs(bookingsQ);
+      const bookingsSnap = await firestore()
+        .collection("bookings")
+        .where("customerId", "==", user.uid)
+        .get();
 
       let totalBookings = 0;
       let totalSpent = 0;
       bookingsSnap.forEach(docSnap => {
-        const data = docSnap.data() as any;
+        const b = docSnap.data() as any;
         totalBookings += 1;
-        if (typeof data.totalAmount === 'number') {
-          totalSpent += data.totalAmount;
+        if (typeof b.totalAmount === "number") {
+          totalSpent += b.totalAmount;
         }
       });
 
-      const reviewsRef = collection(db, 'reviews');
-      const reviewsQ = query(reviewsRef, where('customerId', '==', user.uid));
-      const reviewsSnap = await getDocs(reviewsQ);
+      const reviewsSnap = await firestore()
+        .collection("reviews")
+        .where("customerId", "==", user.uid)
+        .get();
       const totalReviews = reviewsSnap.size;
 
       setUserStats({
@@ -145,24 +142,25 @@ export default function ProfileScreen() {
         memberSince,
       });
     } catch (error) {
-      console.error('Error loading user stats:', error);
-      Alert.alert('Error', 'Failed to load your stats');
+      console.error("Error loading user stats:", error);
+      Alert.alert("Error", "Failed to load your stats");
     }
   };
 
   const handleImageUpload = () => {
-    Alert.alert('Upload Photo', 'Choose an option', [
-      { text: 'Take Photo', onPress: () => openCamera() },
-      { text: 'Choose from Library', onPress: () => openImageLibrary() },
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert("Upload Photo", "Choose an option", [
+      { text: "Take Photo", onPress: () => openCamera() },
+      { text: "Choose from Library", onPress: () => openImageLibrary() },
+      { text: "Cancel", style: "cancel" },
     ]);
   };
 
   const openCamera = async () => {
     try {
-      const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
+      const permissionResult =
+        await ImagePicker.requestCameraPermissionsAsync();
       if (permissionResult.granted === false) {
-        Alert.alert('Permission Required', 'Camera permission is required.');
+        Alert.alert("Permission Required", "Camera permission is required.");
         return;
       }
 
@@ -177,7 +175,7 @@ export default function ProfileScreen() {
         uploadProfileImage(result.assets[0].uri);
       }
     } catch {
-      Alert.alert('Error', 'Failed to open camera');
+      Alert.alert("Error", "Failed to open camera");
     }
   };
 
@@ -194,7 +192,7 @@ export default function ProfileScreen() {
         uploadProfileImage(result.assets[0].uri);
       }
     } catch {
-      Alert.alert('Error', 'Failed to open image library');
+      Alert.alert("Error", "Failed to open image library");
     }
   };
 
@@ -204,44 +202,45 @@ export default function ProfileScreen() {
       // TODO: upload to storage + save URL in Firestore
       await new Promise(resolve => setTimeout(resolve, 1000));
       setProfileImage(uri);
-      Alert.alert('Success', 'Profile photo updated successfully!');
+      Alert.alert("Success", "Profile photo updated successfully!");
     } catch {
-      Alert.alert('Error', 'Failed to upload profile photo');
+      Alert.alert("Error", "Failed to upload profile photo");
     } finally {
       setUploadingImage(false);
     }
   };
 
   const handleRemovePhoto = () => {
-    Alert.alert('Remove Photo', 'Are you sure you want to remove your profile photo?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Remove',
-        style: 'destructive',
-        onPress: () => {
-          setProfileImage(null);
-          Alert.alert('Success', 'Profile photo removed');
+    Alert.alert(
+      "Remove Photo",
+      "Are you sure you want to remove your profile photo?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Remove",
+          style: "destructive",
+          onPress: () => {
+            setProfileImage(null);
+            Alert.alert("Success", "Profile photo removed");
+          },
         },
-      },
-    ]);
+      ]
+    );
   };
 
   const handleLogout = async () => {
-    Alert.alert('Logout', 'Are you sure you want to logout?', [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert("Logout", "Are you sure you want to logout?", [
+      { text: "Cancel", style: "cancel" },
       {
-        text: 'Logout',
-        style: 'destructive',
+        text: "Logout",
+        style: "destructive",
         onPress: async () => {
           setLoading(true);
           try {
-            await signOut(auth);
-            if (Platform.OS === 'web' && (window as any).recaptchaVerifier) {
-              (window as any).recaptchaVerifier.clear();
-            }
-            router.replace('/auth');
+            await authNative().signOut();
+            router.replace("/auth");
           } catch {
-            Alert.alert('Error', 'Failed to logout');
+            Alert.alert("Error", "Failed to logout");
           } finally {
             setLoading(false);
           }
@@ -251,14 +250,14 @@ export default function ProfileScreen() {
   };
 
   const handleEditProfile = () => {
-    setEditName(user?.name || '');
-    setEditEmail(user?.email || '');
+    setEditName(user?.name || "");
+    setEditEmail(user?.email || "");
     setShowEditModal(true);
   };
 
   const handleSaveProfile = async () => {
     if (!user?.uid) {
-      Alert.alert('Error', 'User not found');
+      Alert.alert("Error", "User not found");
       return;
     }
 
@@ -266,103 +265,115 @@ export default function ProfileScreen() {
     const trimmedEmail = editEmail.trim();
 
     if (!trimmedName) {
-      Alert.alert('Error', 'Name cannot be empty');
+      Alert.alert("Error", "Name cannot be empty");
       return;
     }
 
-    // simple optional email validation
-    if (trimmedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
-      Alert.alert('Invalid Email', 'Please enter a valid email address');
+    if (
+      trimmedEmail &&
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)
+    ) {
+      Alert.alert("Invalid Email", "Please enter a valid email address");
       return;
     }
 
     try {
       setLoading(true);
 
-      const userRef = doc(db, 'customers', user.uid);
-      await updateDoc(userRef, {
+      await firestore().collection("customers").doc(user.uid).update({
         name: trimmedName,
-        email: trimmedEmail || '', // empty string if no email [web:155][web:182]
+        email: trimmedEmail || "",
       });
 
       updateUser({
         name: trimmedName,
-        email: trimmedEmail || '',
+        email: trimmedEmail || "",
       });
 
       setShowEditModal(false);
-      Alert.alert('Success', 'Profile updated successfully!');
+      Alert.alert("Success", "Profile updated successfully!");
     } catch (e) {
-      console.error('Profile save error:', e);
-      Alert.alert('Error', 'Failed to update profile');
+      console.error("Profile save error:", e);
+      Alert.alert("Error", "Failed to update profile");
     } finally {
       setLoading(false);
     }
   };
 
   const handleManageAddresses = () => {
-    router.push('/customer/screens/AddressesScreen');
+    router.push("/customer/screens/AddressesScreen");
   };
 
   const handlePaymentMethods = () => {
-    router.push('/customer/screens/PaymentMethodsScreen');
+    router.push("/customer/screens/PaymentMethodsScreen");
   };
 
   const handleNotificationSettings = () => {
-    Alert.alert('Notification Settings', 'Navigate to notification settings screen');
+    Alert.alert(
+      "Notification Settings",
+      "Navigate to notification settings screen"
+    );
   };
 
   const handleWallet = () => {
-    router.push('/customer/screens/WalletScreen');
+    router.push("/customer/screens/WalletScreen");
   };
 
   const handleRewards = () => {
-    Alert.alert('Rewards & Offers', 'View your rewards and available offers');
+    Alert.alert(
+      "Rewards & Offers",
+      "View your rewards and available offers"
+    );
   };
 
   const handleReferFriend = () => {
     Alert.alert(
-      'Refer a Friend',
-      'Share your referral code: UC2024XYZ\n\nYour friend gets ₹200 off and you get ₹100 cashback!'
+      "Refer a Friend",
+      "Share your referral code: UC2024XYZ\n\nYour friend gets ₹200 off and you get ₹100 cashback!"
     );
   };
 
   const handlePrivacyPolicy = () => {
-    Alert.alert('Privacy Policy', 'Navigate to privacy policy screen');
+    Alert.alert("Privacy Policy", "Navigate to privacy policy screen");
   };
 
   const handleTermsConditions = () => {
-    Alert.alert('Terms & Conditions', 'Navigate to terms & conditions screen');
+    Alert.alert("Terms & Conditions", "Navigate to terms & conditions screen");
   };
 
   const handleRateApp = () => {
-    Alert.alert('Rate App', 'Would you like to rate us on the app store?', [
-      { text: 'Not Now', style: 'cancel' },
-      { text: 'Rate Now', onPress: () => Alert.alert('Thank You!', 'Redirecting to app store...') },
+    Alert.alert("Rate App", "Would you like to rate us on the app store?", [
+      { text: "Not Now", style: "cancel" },
+      {
+        text: "Rate Now",
+        onPress: () =>
+          Alert.alert("Thank You!", "Redirecting to app store..."),
+      },
     ]);
   };
 
   const handleShareApp = () => {
-    Alert.alert('Share App', 'Share Vint Services with your friends!');
+    Alert.alert("Share App", "Share Vint Services with your friends!");
   };
 
   const handleDeleteAccount = () => {
     Alert.alert(
-      'Delete Account',
-      'Are you sure you want to delete your account? This action cannot be undone.',
+      "Delete Account",
+      "Are you sure you want to delete your account? This action cannot be undone.",
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: "Cancel", style: "cancel" },
         {
-          text: 'Delete',
-          style: 'destructive',
+          text: "Delete",
+          style: "destructive",
           onPress: async () => {
             try {
               setLoading(true);
               await deleteAccount();
             } catch (error: any) {
               Alert.alert(
-                'Error',
-                error?.message || 'Failed to delete account. Please try again.'
+                "Error",
+                error?.message ||
+                  "Failed to delete account. Please try again."
               );
             } finally {
               setLoading(false);
@@ -375,61 +386,61 @@ export default function ProfileScreen() {
 
   const menuSections: MenuSection[] = [
     {
-      title: 'Account',
+      title: "Account",
       items: [
         {
           id: 1,
-          title: 'Personal Information',
-          icon: 'person-outline',
+          title: "Personal Information",
+          icon: "person-outline",
           action: handleEditProfile,
         },
         {
           id: 2,
-          title: 'Manage Addresses',
-          icon: 'location-outline',
+          title: "Manage Addresses",
+          icon: "location-outline",
           action: handleManageAddresses,
-          badge: '2',
+          badge: "2",
         },
         {
           id: 3,
-          title: 'Payment Methods',
-          icon: 'card-outline',
+          title: "Payment Methods",
+          icon: "card-outline",
           action: handlePaymentMethods,
         },
       ],
     },
     {
-      title: 'Wallet & Rewards',
+      title: "Wallet & Rewards",
       items: [
         {
           id: 4,
-          title: 'My Wallet',
-          icon: 'wallet-outline',
+          title: "My Wallet",
+          icon: "wallet-outline",
           action: handleWallet,
-          subtitle: '₹250 Balance',
+          subtitle: "₹250 Balance",
         },
         {
           id: 5,
-          title: 'Rewards & Offers',
-          icon: 'gift-outline',
+          title: "Rewards & Offers",
+          icon: "gift-outline",
           action: handleRewards,
-          badge: '3',
+          badge: "3",
         },
         {
           id: 6,
-          title: 'Refer a Friend',
-          icon: 'share-social-outline',
+          title: "Refer a Friend",
+          icon: "share-social-outline",
           action: handleReferFriend,
         },
       ],
     },
     {
-      title: 'Preferences',
+      title: "Preferences",
       items: [
         {
           id: 7,
-          title: 'Notifications',
-          icon: 'notifications-outline',
+          title: "Notifications",
+          icon: "notifications-outline",
           action: handleNotificationSettings,
           hasSwitch: true,
           switchValue: notificationsEnabled,
@@ -438,51 +449,55 @@ export default function ProfileScreen() {
       ],
     },
     {
-      title: 'Support & Legal',
+      title: "Support & Legal",
       items: [
         {
           id: 9,
-          title: 'Help & Support',
-          icon: 'help-circle-outline',
-          action: () => Alert.alert('Help & Support', 'Contact us at support@vint.com'),
+          title: "Help & Support",
+          icon: "help-circle-outline",
+          action: () =>
+            Alert.alert(
+              "Help & Support",
+              "Contact us at support@vint.com"
+            ),
         },
         {
           id: 10,
-          title: 'Privacy Policy',
-          icon: 'shield-checkmark-outline',
+          title: "Privacy Policy",
+          icon: "shield-checkmark-outline",
           action: handlePrivacyPolicy,
         },
         {
           id: 11,
-          title: 'Terms & Conditions',
-          icon: 'document-text-outline',
+          title: "Terms & Conditions",
+          icon: "document-text-outline",
           action: handleTermsConditions,
         },
       ],
     },
     {
-      title: 'More',
+      title: "More",
       items: [
         {
           id: 12,
-          title: 'Rate App',
-          icon: 'star-outline',
+          title: "Rate App",
+          icon: "star-outline",
           action: handleRateApp,
         },
         {
           id: 13,
-          title: 'Share App',
-          icon: 'share-outline',
+          title: "Share App",
+          icon: "share-outline",
           action: handleShareApp,
         },
         {
           id: 14,
-          title: 'About',
-          icon: 'information-circle-outline',
+          title: "About",
+          icon: "information-circle-outline",
           action: () =>
             Alert.alert(
-              'About',
-              'Vint Services v1.0.0\nMember since: ' + userStats.memberSince
+              "About",
+              "Vint Services v1.0.0\nMember since: " + userStats.memberSince
             ),
         },
       ],
@@ -497,7 +512,10 @@ export default function ProfileScreen() {
           <View style={styles.profileSection}>
             <View style={styles.avatarContainer}>
               {profileImage ? (
-                <TouchableOpacity onLongPress={handleRemovePhoto} activeOpacity={0.8}>
+                <TouchableOpacity
+                  onLongPress={handleRemovePhoto}
+                  activeOpacity={0.8}
+                >
                   <Image source={{ uri: profileImage }} style={styles.avatar} />
                 </TouchableOpacity>
               ) : (
@@ -518,29 +536,41 @@ export default function ProfileScreen() {
               </TouchableOpacity>
             </View>
             <View style={styles.userInfo}>
-              <Text style={styles.userName}>{user?.name || 'User'}</Text>
-              <Text style={styles.userEmail}>{user?.email || 'No email set'}</Text>
+              <Text style={styles.userName}>{user?.name || "User"}</Text>
+              <Text style={styles.userEmail}>
+                {user?.email || "No email set"}
+              </Text>
               <View style={styles.roleContainer}>
-                <Ionicons name="checkmark-circle" size={14} color="#007AFF" />
+                <Ionicons
+                  name="checkmark-circle"
+                  size={14}
+                  color="#007AFF"
+                />
                 <Text style={styles.roleText}>Verified Customer</Text>
               </View>
             </View>
           </View>
-          <TouchableOpacity style={styles.editButton} onPress={handleEditProfile}>
+          <TouchableOpacity
+            style={styles.editButton}
+            onPress={handleEditProfile}
+          >
             <Ionicons name="pencil" size={20} color="#007AFF" />
           </TouchableOpacity>
         </View>
 
         {/* Stats */}
         <View style={styles.statsContainer}>
-          <TouchableOpacity style={styles.statItem} onPress={() => router.push('/')}>
+          <TouchableOpacity
+            style={styles.statItem}
+            onPress={() => router.push("/")}
+          >
             <Text style={styles.statNumber}>{userStats.totalBookings}</Text>
             <Text style={styles.statLabel}>Bookings</Text>
           </TouchableOpacity>
           <View style={styles.statDivider} />
           <TouchableOpacity
             style={styles.statItem}
-            onPress={() => Alert.alert('Spent', 'View spending history')}
+            onPress={() => Alert.alert("Spent", "View spending history")}
           >
             <Text style={styles.statNumber}>
               ₹{userStats.totalSpent.toLocaleString()}
@@ -550,7 +580,7 @@ export default function ProfileScreen() {
           <View style={styles.statDivider} />
           <TouchableOpacity
             style={styles.statItem}
-            onPress={() => Alert.alert('Reviews', 'View all reviews')}
+            onPress={() => Alert.alert("Reviews", "View all reviews")}
           >
             <Text style={styles.statNumber}>{userStats.totalReviews}</Text>
             <Text style={styles.statLabel}>Reviews</Text>
@@ -571,7 +601,10 @@ export default function ProfileScreen() {
             </View>
             <Text style={styles.quickActionText}>Rewards</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.quickAction} onPress={handleReferFriend}>
+          <TouchableOpacity
+            style={styles.quickAction}
+            onPress={handleReferFriend}
+          >
             <View style={styles.quickActionIcon}>
               <Ionicons name="share-social" size={24} color="#34C759" />
             </View>
@@ -579,7 +612,7 @@ export default function ProfileScreen() {
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.quickAction}
-            onPress={() => Alert.alert('Help', 'Customer support')}
+            onPress={() => Alert.alert("Help", "Customer support")}
           >
             <View style={styles.quickActionIcon}>
               <Ionicons name="headset" size={24} color="#FF3B30" />
@@ -606,7 +639,9 @@ export default function ProfileScreen() {
                     <View style={styles.menuTextContainer}>
                       <Text style={styles.menuItemText}>{item.title}</Text>
                       {item.subtitle && (
-                        <Text style={styles.menuItemSubtitle}>{item.subtitle}</Text>
+                        <Text style={styles.menuItemSubtitle}>
+                          {item.subtitle}
+                        </Text>
                       )}
                     </View>
                   </View>
@@ -622,11 +657,15 @@ export default function ProfileScreen() {
                       <Switch
                         value={item.switchValue}
                         onValueChange={item.onSwitchToggle}
-                        trackColor={{ false: '#ccc', true: '#007AFF' }}
+                        trackColor={{ false: "#ccc", true: "#007AFF" }}
                         thumbColor="#fff"
                       />
                     ) : (
-                      <Ionicons name="chevron-forward" size={20} color="#ccc" />
+                      <Ionicons
+                        name="chevron-forward"
+                        size={20}
+                        color="#ccc"
+                      />
                     )}
                   </View>
                 </TouchableOpacity>
@@ -636,7 +675,10 @@ export default function ProfileScreen() {
         ))}
 
         {/* Delete Account */}
-        <TouchableOpacity style={styles.deleteButton} onPress={handleDeleteAccount}>
+        <TouchableOpacity
+          style={styles.deleteButton}
+          onPress={handleDeleteAccount}
+        >
           <Ionicons name="trash-outline" size={20} color="#FF3B30" />
           <Text style={styles.deleteText}>Delete Account</Text>
         </TouchableOpacity>
@@ -649,15 +691,19 @@ export default function ProfileScreen() {
         >
           <Ionicons name="log-out-outline" size={24} color="#FF3B30" />
           <Text style={styles.logoutText}>
-            {loading ? 'Logging out...' : 'Logout'}
+            {loading ? "Logging out..." : "Logout"}
           </Text>
         </TouchableOpacity>
 
         {/* App Info */}
         <View style={styles.appInfo}>
           <Text style={styles.appInfoText}>Vint Services v1.0.0</Text>
-          <Text style={styles.appInfoText}>Member since {userStats.memberSince}</Text>
-          <Text style={styles.appInfoText}>Made with ❤️ for better services</Text>
+          <Text style={styles.appInfoText}>
+            Member since {userStats.memberSince}
+          </Text>
+          <Text style={styles.appInfoText}>
+            Made with ❤️ for better services
+          </Text>
         </View>
       </ScrollView>
 
@@ -695,11 +741,13 @@ export default function ProfileScreen() {
                 keyboardType="email-address"
                 autoCapitalize="none"
               />
-              <Text style={styles.inputHint}>You can update your email anytime</Text>
+              <Text style={styles.inputHint}>
+                You can update your email anytime
+              </Text>
             </View>
 
-            <TouchableOpacity 
-              style={[styles.saveButton, loading && styles.saveButtonDisabled]} 
+            <TouchableOpacity
+              style={[styles.saveButton, loading && styles.saveButtonDisabled]}
               onPress={handleSaveProfile}
               disabled={loading}
             >
@@ -717,252 +765,161 @@ export default function ProfileScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f8f9fa',
-  },
+  container: { flex: 1, backgroundColor: "#f8f9fa" },
   header: {
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     paddingHorizontal: 20,
     paddingVertical: 40,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
-  profileSection: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  avatarContainer: {
-    marginRight: 16,
-    position: 'relative',
-  },
-  avatar: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
-  },
+  profileSection: { flexDirection: "row", alignItems: "center", flex: 1 },
+  avatarContainer: { marginRight: 16, position: "relative" },
+  avatar: { width: 70, height: 70, borderRadius: 35 },
   avatarPlaceholder: {
     width: 70,
     height: 70,
     borderRadius: 35,
-    backgroundColor: '#007AFF',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "#007AFF",
+    justifyContent: "center",
+    alignItems: "center",
   },
   cameraButton: {
-    position: 'absolute',
+    position: "absolute",
     bottom: 0,
     right: 0,
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: '#007AFF',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "#007AFF",
+    justifyContent: "center",
+    alignItems: "center",
     borderWidth: 2,
-    borderColor: '#fff',
+    borderColor: "#fff",
   },
-  userInfo: {
-    flex: 1,
-  },
-  userName: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 4,
-  },
-  userEmail: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 8,
-  },
+  userInfo: { flex: 1 },
+  userName: { fontSize: 20, fontWeight: "bold", color: "#333", marginBottom: 4 },
+  userEmail: { fontSize: 14, color: "#666", marginBottom: 8 },
   roleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#007AFF15',
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#007AFF15",
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 12,
-    alignSelf: 'flex-start',
+    alignSelf: "flex-start",
     gap: 4,
   },
-  roleText: {
-    fontSize: 12,
-    color: '#007AFF',
-    fontWeight: '600',
-  },
+  roleText: { fontSize: 12, color: "#007AFF", fontWeight: "600" },
   editButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#f8f9fa',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "#f8f9fa",
+    justifyContent: "center",
+    alignItems: "center",
   },
   statsContainer: {
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     marginTop: 12,
     paddingVertical: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-around',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-around",
   },
-  statItem: {
-    alignItems: 'center',
-    flex: 1,
-  },
-  statNumber: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 4,
-  },
-  statLabel: {
-    fontSize: 14,
-    color: '#666',
-  },
-  statDivider: {
-    width: 1,
-    height: 40,
-    backgroundColor: '#f0f0f0',
-  },
+  statItem: { alignItems: "center", flex: 1 },
+  statNumber: { fontSize: 24, fontWeight: "bold", color: "#333", marginBottom: 4 },
+  statLabel: { fontSize: 14, color: "#666" },
+  statDivider: { width: 1, height: 40, backgroundColor: "#f0f0f0" },
   quickActionsContainer: {
-    flexDirection: 'row',
-    backgroundColor: '#fff',
+    flexDirection: "row",
+    backgroundColor: "#fff",
     marginTop: 12,
     paddingVertical: 20,
     paddingHorizontal: 10,
-    justifyContent: 'space-around',
+    justifyContent: "space-around",
   },
-  quickAction: {
-    alignItems: 'center',
-  },
+  quickAction: { alignItems: "center" },
   quickActionIcon: {
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: '#f8f9fa',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "#f8f9fa",
+    justifyContent: "center",
+    alignItems: "center",
     marginBottom: 8,
   },
-  quickActionText: {
-    fontSize: 12,
-    color: '#333',
-    fontWeight: '500',
-  },
+  quickActionText: { fontSize: 12, color: "#333", fontWeight: "500" },
   sectionTitle: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#999',
+    fontWeight: "600",
+    color: "#999",
     paddingHorizontal: 20,
     paddingTop: 24,
     paddingBottom: 8,
-    textTransform: 'uppercase',
+    textTransform: "uppercase",
     letterSpacing: 0.5,
   },
-  menuContainer: {
-    backgroundColor: '#fff',
-    paddingVertical: 8,
-  },
+  menuContainer: { backgroundColor: "#fff", paddingVertical: 8 },
   menuItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingHorizontal: 20,
     paddingVertical: 14,
   },
-  menuItemLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
+  menuItemLeft: { flexDirection: "row", alignItems: "center", flex: 1 },
   menuIconContainer: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#f8f9fa',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "#f8f9fa",
+    justifyContent: "center",
+    alignItems: "center",
     marginRight: 12,
   },
-  menuTextContainer: {
-    flex: 1,
-  },
-  menuItemText: {
-    fontSize: 16,
-    color: '#333',
-  },
-  menuItemSubtitle: {
-    fontSize: 13,
-    color: '#999',
-    marginTop: 2,
-  },
-  menuItemRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
+  menuTextContainer: { flex: 1 },
+  menuItemText: { fontSize: 16, color: "#333" },
+  menuItemSubtitle: { fontSize: 13, color: "#999", marginTop: 2 },
+  menuItemRight: { flexDirection: "row", alignItems: "center", gap: 8 },
   badge: {
-    backgroundColor: '#FF3B30',
+    backgroundColor: "#FF3B30",
     borderRadius: 10,
     minWidth: 20,
     height: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     paddingHorizontal: 6,
   },
-  badgeText: {
-    fontSize: 11,
-    fontWeight: 'bold',
-    color: '#fff',
-  },
+  badgeText: { fontSize: 11, fontWeight: "bold", color: "#fff" },
   deleteButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#fff',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#fff",
     marginTop: 24,
     paddingVertical: 14,
   },
-  deleteText: {
-    fontSize: 15,
-    color: '#FF3B30',
-    fontWeight: '500',
-    marginLeft: 8,
-  },
+  deleteText: { fontSize: 15, color: "#FF3B30", fontWeight: "500", marginLeft: 8 },
   logoutButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#fff',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#fff",
     marginTop: 12,
     paddingVertical: 16,
   },
-  logoutText: {
-    fontSize: 16,
-    color: '#FF3B30',
-    fontWeight: '500',
-    marginLeft: 8,
-  },
-  appInfo: {
-    alignItems: 'center',
-    paddingVertical: 32,
-  },
-  appInfoText: {
-    fontSize: 12,
-    color: '#999',
-    marginBottom: 4,
-  },
+  logoutText: { fontSize: 16, color: "#FF3B30", fontWeight: "500", marginLeft: 8 },
+  appInfo: { alignItems: "center", paddingVertical: 32 },
+  appInfoText: { fontSize: 12, color: "#999", marginBottom: 4 },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "flex-end",
   },
   modalContent: {
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     paddingTop: 20,
@@ -970,51 +927,35 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: 24,
   },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#333',
-  },
-  inputContainer: {
-    marginBottom: 20,
-  },
+  modalTitle: { fontSize: 20, fontWeight: "700", color: "#333" },
+  inputContainer: { marginBottom: 20 },
   inputLabel: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#333',
+    fontWeight: "600",
+    color: "#333",
     marginBottom: 8,
   },
   input: {
     borderWidth: 1,
-    borderColor: '#e0e0e0',
+    borderColor: "#e0e0e0",
     borderRadius: 12,
     padding: 16,
     fontSize: 15,
-    color: '#333',
+    color: "#333",
   },
-  inputHint: {
-    fontSize: 12,
-    color: '#999',
-    marginTop: 4,
-  },
+  inputHint: { fontSize: 12, color: "#999", marginTop: 4 },
   saveButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: "#007AFF",
     paddingVertical: 16,
     borderRadius: 12,
-    alignItems: 'center',
+    alignItems: "center",
     marginTop: 8,
   },
-  saveButtonDisabled: {
-    opacity: 0.6,
-  },
-  saveButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '700',
-  },
+  saveButtonDisabled: { opacity: 0.6 },
+  saveButtonText: { color: "#fff", fontSize: 16, fontWeight: "700" },
 });

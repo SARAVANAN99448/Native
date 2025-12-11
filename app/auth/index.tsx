@@ -16,14 +16,23 @@ import {
 import { useRouter } from "expo-router";
 import { useAuth } from "../../contexts/AuthContext";
 
+
+
 export default function AuthScreen() {
   const [phone, setPhone] = useState("+91");
   const [otpSent, setOtpSent] = useState(false);
   const [otp, setOtp] = useState("");
+  const [sendingCooldown, setSendingCooldown] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const router = useRouter();
-  const { sendOTP, verifyOTP, loading: authLoading } = useAuth();
+  const { sendOTP, verifyOTP, loading: authLoading, resetConfirmation } =
+    useAuth();
+
+  const handleSendCooldown = () => {
+    setSendingCooldown(true);
+    setTimeout(() => setSendingCooldown(false), 30000);
+  };
 
   const handlePhoneAuth = async () => {
     if (!/^\+91\d{10}$/.test(phone)) {
@@ -31,44 +40,59 @@ export default function AuthScreen() {
       return;
     }
 
+    // Send OTP
     if (!otpSent) {
       try {
-        setLoading(true);
-        await sendOTP(phone); // native auth().signInWithPhoneNumber inside context
-        setOtpSent(true);
-        Alert.alert("OTP Sent", "Check your phone for the verification code.");
-      } catch (error: any) {
-        Alert.alert("Error", error?.message || "Failed to send OTP");
-      } finally {
-        setLoading(false);
-      }
-    } else {
-      if (otp.length !== 6) return;
-      try {
-        setLoading(true);
-        const userData = await verifyOTP(otp); // confirmation.confirm inside context
-        if (userData.role === "customer") {
-          router.replace("/customer");
-        } else {
-          Alert.alert("Error", "Invalid user role");
+        if (sendingCooldown) {
+          Alert.alert(
+            "Please wait",
+            "You can request OTP again after 30 seconds"
+          );
+          return;
         }
-      } catch (error: any) {
-        Alert.alert(
-          "Verification Failed",
-          error?.message || "Invalid or expired OTP. Try again."
-        );
+        setLoading(true);
+        await sendOTP(phone);
+        setOtpSent(true);
+        handleSendCooldown();
+        Alert.alert("OTP Sent", "Check your phone for the verification code.");
+      } catch (error) {
+        
       } finally {
         setLoading(false);
       }
+      return;
+    }
+
+    // Verify OTP
+    if (otp.length !== 6) {
+      Alert.alert("Invalid OTP", "Please enter the 6-digit OTP");
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const userData = await verifyOTP(otp);
+      if (userData.role === "customer") {
+        router.replace("/customer");
+      } else {
+        Alert.alert("Error", "Invalid user role");
+      }
+    } catch (error) {
+      
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleOTPChange = (text: string) => {
     const cleaned = text.replace(/\D/g, "");
     setOtp(cleaned);
-    if (cleaned.length === 6) {
-      setTimeout(() => handlePhoneAuth(), 100);
-    }
+  };
+
+  const resetFlow = () => {
+    resetConfirmation();
+    setOtp("");
+    setOtpSent(false);
   };
 
   return (
@@ -77,10 +101,7 @@ export default function AuthScreen() {
         style={styles.container}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
-        <ScrollView
-          contentContainerStyle={styles.scrollContent}
-          keyboardShouldPersistTaps="handled"
-        >
+        <ScrollView contentContainerStyle={styles.scrollContent}>
           <View style={styles.header}>
             <Image
               style={styles.logo}
@@ -108,17 +129,16 @@ export default function AuthScreen() {
                   setPhone("+91" + cleaned);
                 }}
                 keyboardType="phone-pad"
-                maxLength={13}
                 editable={!loading && !authLoading}
+                maxLength={13}
               />
             ) : (
               <>
-                <View style={styles.otpInfo}>
-                  <Text style={styles.otpInfoText}>
-                    Enter the 6‑digit code sent to
-                  </Text>
-                  <Text style={styles.phoneNumber}>{phone}</Text>
-                </View>
+                <Text style={styles.otpInfoText}>
+                  Enter the 6-digit code sent to
+                </Text>
+                <Text style={styles.phoneNumber}>{phone}</Text>
+
                 <TextInput
                   style={[styles.input, styles.otpInput]}
                   placeholder="••••••"
@@ -126,9 +146,6 @@ export default function AuthScreen() {
                   onChangeText={handleOTPChange}
                   keyboardType="number-pad"
                   maxLength={6}
-                  editable={!loading && !authLoading}
-                  textContentType="oneTimeCode"
-                  autoComplete="sms-otp"
                   autoFocus
                 />
               </>
@@ -142,28 +159,52 @@ export default function AuthScreen() {
               onPress={handlePhoneAuth}
               disabled={loading || authLoading}
             >
-              {(loading || authLoading) ? (
+              {loading || authLoading ? (
                 <ActivityIndicator color="#fff" />
               ) : (
                 <Text style={styles.submitButtonText}>
-                  {otpSent ? "Verify OTP" : "Send OTP"}
+                  {otpSent
+                    ? "Verify OTP"
+                    : sendingCooldown
+                    ? "Wait 30s"
+                    : "Send OTP"}
                 </Text>
               )}
             </TouchableOpacity>
 
             {otpSent && (
-              <TouchableOpacity
-                style={styles.switchButton}
-                onPress={() => {
-                  setOtpSent(false);
-                  setOtp("");
-                }}
-                disabled={loading || authLoading}
-              >
-                <Text style={styles.switchButtonText}>
-                  ← Back to Phone Number
-                </Text>
-              </TouchableOpacity>
+              <>
+                <TouchableOpacity style={styles.switchButton} onPress={resetFlow}>
+                  <Text style={styles.switchButtonText}>
+                    ← Back to Phone Number
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.switchButton}
+                  onPress={async () => {
+                    if (sendingCooldown) {
+                      Alert.alert(
+                        "Please wait",
+                        "Request OTP again after cooldown."
+                      );
+                      return;
+                    }
+                    try {
+                      setLoading(true);
+                      await sendOTP(phone);
+                      handleSendCooldown();
+                      Alert.alert("OTP Sent", "A new OTP has been sent.");
+                    } catch (error) {
+                     
+                    } finally {
+                      setLoading(false);
+                    }
+                  }}
+                >
+                  <Text style={styles.switchButtonText}>Resend OTP</Text>
+                </TouchableOpacity>
+              </>
             )}
           </View>
         </ScrollView>
@@ -171,18 +212,15 @@ export default function AuthScreen() {
     </SafeAreaView>
   );
 }
+
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#fff" },
   scrollContent: { flexGrow: 1, paddingBottom: 40 },
-  header: {
-    alignItems: "center",
-    paddingTop: 60,
-    paddingBottom: 10,
-  },
+  header: { alignItems: "center", paddingTop: 60 },
   logo: { width: 100, height: 100 },
   title: { fontSize: 32, fontWeight: "bold", color: "#333", marginTop: 16 },
   subtitle: { fontSize: 16, color: "#666", marginTop: 8 },
-  form: { flex: 1, paddingHorizontal: 24 },
+  form: { paddingHorizontal: 24, marginTop: 20 },
   input: {
     backgroundColor: "#f8f9fa",
     borderRadius: 12,
@@ -191,7 +229,6 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     borderWidth: 1,
     borderColor: "#e9ecef",
-    color: "#333",
   },
   otpInput: {
     fontSize: 24,
@@ -199,20 +236,21 @@ const styles = StyleSheet.create({
     letterSpacing: 8,
     fontWeight: "600",
   },
-  otpInfo: { alignItems: "center", marginBottom: 20, paddingHorizontal: 20 },
-  otpInfoText: { fontSize: 14, color: "#666", marginBottom: 8 },
-  phoneNumber: { fontSize: 18, fontWeight: "600", color: "#007AFF" },
   submitButton: {
     backgroundColor: "#007AFF",
     borderRadius: 12,
     padding: 16,
     alignItems: "center",
-    marginBottom: 16,
-    minHeight: 56,
-    justifyContent: "center",
   },
-  submitButtonDisabled: { opacity: 0.6 },
+  submitButtonDisabled: { opacity: 0.5 },
   submitButtonText: { color: "#fff", fontSize: 18, fontWeight: "600" },
-  switchButton: { alignItems: "center", paddingVertical: 16 },
+  switchButton: { alignItems: "center", paddingVertical: 12 },
   switchButtonText: { color: "#007AFF", fontSize: 16 },
+  otpInfoText: { textAlign: "center", fontSize: 14, color: "#666" },
+  phoneNumber: {
+    textAlign: "center",
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#007AFF",
+  },
 });

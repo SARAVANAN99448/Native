@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -8,22 +8,11 @@ import {
   TouchableOpacity,
   Alert,
   ActivityIndicator,
-} from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { useAuth } from '../../../contexts/AuthContext';
-import {
-  collection,
-  query,
-  where,
-  orderBy,
-  getDocs,
-  updateDoc,
-  doc,
-  Timestamp,
-  addDoc,
-} from 'firebase/firestore';
-import { db } from '../../../config/firebaseConfig';
-import { useRouter } from 'expo-router';
+} from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { useAuth } from "../../../contexts/AuthContext";
+import firestore from "@react-native-firebase/firestore";
+import { useRouter } from "expo-router";
 
 type Booking = {
   id: string;
@@ -49,9 +38,8 @@ export default function BookingsScreen() {
 
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'upcoming' | 'completed' | 'cancelled'>(
-    'upcoming'
-  );
+  const [activeTab, setActiveTab] =
+    useState<"upcoming" | "completed" | "cancelled">("upcoming");
 
   useEffect(() => {
     if (user?.uid) {
@@ -64,25 +52,19 @@ export default function BookingsScreen() {
 
     setLoading(true);
     try {
-      const bookingsRef = collection(db, 'bookings');
-      const q = query(
-        bookingsRef,
-        where('customerId', '==', user.uid),
-        orderBy('createdAt', 'desc')
-      );
+      const snap = await firestore()
+        .collection("bookings")
+        .where("customerId", "==", user.uid)
+        .orderBy("createdAt", "desc")
+        .get();
 
-      const snapshot = await getDocs(q);
-      const bookingsData: Booking[] = [];
-      snapshot.forEach(d => {
-        bookingsData.push({
-          id: d.id,
-          ...d.data(),
-        } as Booking);
-      });
-
+      const bookingsData: Booking[] = snap.docs.map(d => ({
+        id: d.id,
+        ...(d.data() as any),
+      }));
       setBookings(bookingsData);
     } catch (error) {
-      console.error('Error loading bookings:', error);
+      console.error("Error loading bookings:", error);
       setBookings([]);
     } finally {
       setLoading(false);
@@ -90,52 +72,61 @@ export default function BookingsScreen() {
   };
 
   const handleCancelBooking = async (booking: Booking) => {
-    Alert.alert('Cancel Booking', 'Are you sure you want to cancel this booking?', [
-      { text: 'No', style: 'cancel' },
-      {
-        text: 'Yes, Cancel',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            const bookingRef = doc(db, 'bookings', booking.id);
-            await updateDoc(bookingRef, {
-              status: 'cancelled',
-              updatedAt: Timestamp.now(),
-            });
+    Alert.alert(
+      "Cancel Booking",
+      "Are you sure you want to cancel this booking?",
+      [
+        { text: "No", style: "cancel" },
+        {
+          text: "Yes, Cancel",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              const bookingRef = firestore()
+                .collection("bookings")
+                .doc(booking.id);
 
-            if (booking.providerId) {
-              await addDoc(collection(db, 'notifications'), {
-                userId: booking.providerId,
-                title: 'Booking Cancelled',
-                message: `Customer cancelled: ${booking.serviceName} scheduled for ${booking.scheduledDate} at ${booking.scheduledTime}`,
-                type: 'booking_cancelled',
-                bookingId: booking.id,
-                isRead: false,
-                createdAt: Timestamp.now(),
+              await bookingRef.update({
+                status: "cancelled",
+                updatedAt: firestore.FieldValue.serverTimestamp(),
               });
-            }
 
-            Alert.alert('Success', 'Booking cancelled successfully');
-            loadBookings();
-          } catch (error) {
-            console.error('Error cancelling booking:', error);
-            Alert.alert('Error', 'Failed to cancel booking');
-          }
+              if (booking.providerId) {
+                await firestore().collection("notifications").add({
+                  userId: booking.providerId,
+                  title: "Booking Cancelled",
+                  message: `Customer cancelled: ${booking.serviceName} scheduled for ${booking.scheduledDate} at ${booking.scheduledTime}`,
+                  type: "booking_cancelled",
+                  bookingId: booking.id,
+                  isRead: false,
+                  createdAt: firestore.FieldValue.serverTimestamp(),
+                });
+              }
+
+              Alert.alert("Success", "Booking cancelled successfully");
+              loadBookings();
+            } catch (error) {
+              console.error("Error cancelling booking:", error);
+              Alert.alert("Error", "Failed to cancel booking");
+            }
+          },
         },
-      },
-    ]);
+      ]
+    );
   };
 
   const filterBookings = () => {
     return bookings.filter(booking => {
-      if (activeTab === 'upcoming') {
-        return ['pending', 'confirmed', 'in_progress'].includes(booking.status);
+      if (activeTab === "upcoming") {
+        return ["pending", "confirmed", "in_progress"].includes(
+          booking.status
+        );
       }
-      if (activeTab === 'completed') {
-        return booking.status === 'completed';
+      if (activeTab === "completed") {
+        return booking.status === "completed";
       }
-      if (activeTab === 'cancelled') {
-        return booking.status === 'cancelled';
+      if (activeTab === "cancelled") {
+        return booking.status === "cancelled";
       }
       return false;
     });
@@ -143,44 +134,44 @@ export default function BookingsScreen() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'pending':
-        return '#FF9500';
-      case 'confirmed':
-        return '#007AFF';
-      case 'in_progress':
-        return '#5856D6';
-      case 'completed':
-        return '#34C759';
-      case 'cancelled':
-        return '#FF3B30';
+      case "pending":
+        return "#FF9500";
+      case "confirmed":
+        return "#007AFF";
+      case "in_progress":
+        return "#5856D6";
+      case "completed":
+        return "#34C759";
+      case "cancelled":
+        return "#FF3B30";
       default:
-        return '#999';
+        return "#999";
     }
   };
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'pending':
-        return 'time-outline';
-      case 'confirmed':
-        return 'checkmark-circle-outline';
-      case 'in_progress':
-        return 'play-circle-outline';
-      case 'completed':
-        return 'checkmark-done-circle-outline';
-      case 'cancelled':
-        return 'close-circle-outline';
+      case "pending":
+        return "time-outline";
+      case "confirmed":
+        return "checkmark-circle-outline";
+      case "in_progress":
+        return "play-circle-outline";
+      case "completed":
+        return "checkmark-done-circle-outline";
+      case "cancelled":
+        return "close-circle-outline";
       default:
-        return 'help-circle-outline';
+        return "help-circle-outline";
     }
   };
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
-    return date.toLocaleDateString('en-IN', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
+    return date.toLocaleDateString("en-IN", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
     });
   };
 
@@ -192,7 +183,7 @@ export default function BookingsScreen() {
           <View
             style={[
               styles.statusBadge,
-              { backgroundColor: getStatusColor(booking.status) + '20' },
+              { backgroundColor: getStatusColor(booking.status) + "20" },
             ]}
           >
             <Ionicons
@@ -200,28 +191,33 @@ export default function BookingsScreen() {
               size={14}
               color={getStatusColor(booking.status)}
             />
-            <Text style={[styles.statusText, { color: getStatusColor(booking.status) }]}>
+            <Text
+              style={[
+                styles.statusText,
+                { color: getStatusColor(booking.status) },
+              ]}
+            >
               {booking.status
                 .charAt(0)
-                .toUpperCase() + booking.status.slice(1).replace('_', ' ')}
+                .toUpperCase() +
+                booking.status.slice(1).replace("_", " ")}
             </Text>
           </View>
         </View>
       </View>
 
       <View style={styles.bookingDetails}>
-        <View className="detailRow" style={styles.detailRow}>
+        <View style={styles.detailRow}>
           <Ionicons name="calendar-outline" size={16} color="#666" />
           <Text style={styles.detailText}>
             {formatDate(booking.scheduledDate)} at {booking.scheduledTime}
           </Text>
         </View>
 
-        {/* Address is now clickable to change/select address in booking flow */}
         <TouchableOpacity
           style={styles.detailRow}
           onPress={() => {
-            router.push('/customer/screens/BookingModal');
+            router.push("/customer/screens/BookingModal");
           }}
         >
           <Ionicons name="location-outline" size={16} color="#666" />
@@ -246,7 +242,7 @@ export default function BookingsScreen() {
       </View>
 
       <View style={styles.bookingActions}>
-        {['pending', 'confirmed'].includes(booking.status) && (
+        {["pending", "confirmed"].includes(booking.status) && (
           <TouchableOpacity
             style={styles.cancelButton}
             onPress={() => handleCancelBooking(booking)}
@@ -258,7 +254,7 @@ export default function BookingsScreen() {
         <TouchableOpacity
           style={styles.detailsButton}
           onPress={() =>
-            Alert.alert('Booking Details', `Booking ID: ${booking.id}`)
+            Alert.alert("Booking Details", `Booking ID: ${booking.id}`)
           }
         >
           <Text style={styles.detailsButtonText}>View Details</Text>
@@ -288,39 +284,39 @@ export default function BookingsScreen() {
 
       <View style={styles.tabsContainer}>
         <TouchableOpacity
-          style={[styles.tab, activeTab === 'upcoming' && styles.activeTab]}
-          onPress={() => setActiveTab('upcoming')}
+          style={[styles.tab, activeTab === "upcoming" && styles.activeTab]}
+          onPress={() => setActiveTab("upcoming")}
         >
           <Text
             style={[
               styles.tabText,
-              activeTab === 'upcoming' && styles.activeTabText,
+              activeTab === "upcoming" && styles.activeTabText,
             ]}
           >
             Upcoming
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.tab, activeTab === 'completed' && styles.activeTab]}
-          onPress={() => setActiveTab('completed')}
+          style={[styles.tab, activeTab === "completed" && styles.activeTab]}
+          onPress={() => setActiveTab("completed")}
         >
           <Text
             style={[
               styles.tabText,
-              activeTab === 'completed' && styles.activeTabText,
+              activeTab === "completed" && styles.activeTabText,
             ]}
           >
             Completed
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.tab, activeTab === 'cancelled' && styles.activeTab]}
-          onPress={() => setActiveTab('cancelled')}
+          style={[styles.tab, activeTab === "cancelled" && styles.activeTab]}
+          onPress={() => setActiveTab("cancelled")}
         >
           <Text
             style={[
               styles.tabText,
-              activeTab === 'cancelled' && styles.activeTabText,
+              activeTab === "cancelled" && styles.activeTabText,
             ]}
           >
             Cancelled
@@ -333,7 +329,9 @@ export default function BookingsScreen() {
           <View style={styles.emptyState}>
             <Ionicons name="calendar-outline" size={80} color="#e0e0e0" />
             <Text style={styles.emptyText}>No {activeTab} bookings</Text>
-            <Text style={styles.emptySubtext}>Book a service to get started</Text>
+            <Text style={styles.emptySubtext}>
+              Book a service to get started
+            </Text>
           </View>
         ) : (
           filteredBookings.map(renderBookingCard)
@@ -342,6 +340,8 @@ export default function BookingsScreen() {
     </SafeAreaView>
   );
 }
+
+
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f8f9fa' },

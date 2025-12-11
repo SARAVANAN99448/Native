@@ -1,15 +1,12 @@
-// contexts/AuthContext.tsx
 import React, {
   createContext,
   useContext,
   useEffect,
   useState,
 } from "react";
-import { doc, getDoc, setDoc, deleteDoc } from "firebase/firestore";
-import authNative, {
-  FirebaseAuthTypes,
-} from "@react-native-firebase/auth";
-import { db, app } from "../config/firebaseConfig";
+import { Alert } from "react-native";
+import authNative, { FirebaseAuthTypes } from "@react-native-firebase/auth";
+import firestore from "@react-native-firebase/firestore";
 import { useRouter } from "expo-router";
 
 type Role = "customer";
@@ -33,8 +30,8 @@ type AuthContextType = {
   verifyOTP: (otp: string) => Promise<UserData>;
   logout: () => Promise<void>;
   deleteAccount: () => Promise<void>;
-  app: typeof app;
   updateUser: (data: Partial<UserData>) => void;
+  resetConfirmation: () => void;
 };
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -43,35 +40,44 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const router = useRouter();
   const [user, setUser] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(true);
-
   const [confirmation, setConfirmation] =
     useState<FirebaseAuthTypes.ConfirmationResult | null>(null);
 
-  // Helper to load/create Firestore user from Firebase user
   const loadOrCreateUser = async (
     firebaseUser: FirebaseAuthTypes.User
   ): Promise<UserData> => {
     const uid = firebaseUser.uid;
-    const customerRef = doc(db, "customers", uid);
-    const snap = await getDoc(customerRef);
+    const customerRef = firestore().collection("customers").doc(uid);
 
-    if (snap.exists()) {
-      const data = snap.data() as CustomerDoc;
-      const userData: UserData = { uid, ...data };
-      setUser(userData);
-      return userData;
-    } else {
-      const newDoc: CustomerDoc = {
-        name: firebaseUser.displayName || "",
-        email: firebaseUser.email || "",
-        phone: firebaseUser.phoneNumber || "",
-        role: "customer",
-        createdAt: new Date().toISOString(),
-      };
-      await setDoc(customerRef, newDoc);
-      const userData: UserData = { uid, ...newDoc };
-      setUser(userData);
-      return userData;
+    try {
+      const snap = await customerRef.get();
+      const existing = snap.data() as CustomerDoc | undefined;
+
+      if (existing) {
+        const userData: UserData = { uid, ...existing };
+        setUser(userData);
+        return userData;
+      } else {
+        const newDoc: CustomerDoc = {
+          name: firebaseUser.displayName || "",
+          email: firebaseUser.email || "",
+          phone: firebaseUser.phoneNumber || "",
+          role: "customer",
+          createdAt: new Date().toISOString(),
+        };
+        await customerRef.set(newDoc);
+        const userData: UserData = { uid, ...newDoc };
+        setUser(userData);
+        return userData;
+      }
+    } catch (e: any) {
+      Alert.alert(
+        "Firestore error",
+        `Code: ${e?.code ?? "unknown"}\nMessage: ${
+          e?.message ?? "no message"
+        }`
+      );
+      throw e;
     }
   };
 
@@ -102,10 +108,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
 
     try {
-      const confirm = await authNative().signInWithPhoneNumber(phoneNumber); // sends SMS
+      setConfirmation(null);
+      const confirm = await authNative().signInWithPhoneNumber(phoneNumber);
       setConfirmation(confirm);
     } catch (e: any) {
-      console.log("OTP send error", e?.code, e?.message);
+      Alert.alert(
+        "Send OTP error",
+        `Code: ${e?.code ?? "unknown"}\nMessage: ${
+          e?.message ?? "no message"
+        }`
+      );
       throw e;
     }
   };
@@ -115,9 +127,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       throw new Error("Invalid OTP format");
     }
 
-    // If we have no confirmation, maybe auto-verified already
+    const current = authNative().currentUser;
     if (!confirmation) {
-      const current = authNative().currentUser;
       if (current) {
         return await loadOrCreateUser(current);
       }
@@ -131,19 +142,19 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         throw new Error("User not found after phone verification");
       }
 
-      const firebaseUser = res.user;
       setConfirmation(null);
-      return await loadOrCreateUser(firebaseUser);
+      return await loadOrCreateUser(res.user);
     } catch (e: any) {
-      console.log("OTP verify error", e?.code, e?.message);
+      const code = e?.code ?? "unknown";
+      const message = e?.message ?? "no message";
 
-      // Handle auto-verification case: session expired but user already signed in
-      if (e?.code === "auth/session-expired") {
-        const current = authNative().currentUser;
-        if (current) {
-          setConfirmation(null);
-          return await loadOrCreateUser(current);
-        }
+      Alert.alert("Verify OTP error", `Code: ${code}\nMessage: ${message}`);
+
+      if (code === "auth/session-expired" || code === "auth/code-expired") {
+        setConfirmation(null);
+        throw new Error(
+          "Code expired. Please request a new OTP and try again."
+        );
       }
 
       throw e;
@@ -164,7 +175,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
     const uid = current.uid;
 
-    await deleteDoc(doc(db, "customers", uid));
+    await firestore().collection("customers").doc(uid).delete();
     await current.delete();
 
     setUser(null);
@@ -176,6 +187,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     setUser((prev) => (prev ? { ...prev, ...data } : prev));
   };
 
+  const resetConfirmation = () => {
+    setConfirmation(null);
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -185,8 +200,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         verifyOTP,
         logout,
         deleteAccount,
-        app,
         updateUser,
+        resetConfirmation,
       }}
     >
       {children}

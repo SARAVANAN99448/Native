@@ -14,18 +14,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useAuth } from "../../../contexts/AuthContext";
-import {
-  collection,
-  addDoc,
-  updateDoc,
-  deleteDoc,
-  doc,
-  query,
-  where,
-  onSnapshot,
-  Timestamp,
-} from "firebase/firestore";
-import { db } from "../../../config/firebaseConfig";
+import firestore from "@react-native-firebase/firestore";
 
 type Address = {
   id: string;
@@ -69,17 +58,25 @@ export default function AddressesScreen() {
       return;
     }
 
-    const addressesRef = collection(db, "addresses");
-    const q = query(addressesRef, where("userId", "==", user.uid));
+    const q = firestore()
+      .collection("addresses")
+      .where("userId", "==", user.uid);
 
-    const unsubscribe = onSnapshot(q, snapshot => {
-      const list: Address[] = [];
-      snapshot.forEach(d => {
-        list.push({ id: d.id, ...d.data() } as Address);
-      });
-      setAddresses(list);
-      setLoading(false);
-    });
+    const unsubscribe = q.onSnapshot(
+      snapshot => {
+        const list: Address[] = snapshot.docs.map(d => ({
+          id: d.id,
+          ...(d.data() as any),
+        }));
+        setAddresses(list);
+        setLoading(false);
+      },
+      error => {
+        console.log("Addresses onSnapshot error", error);
+        Alert.alert("Error", "Failed to load addresses");
+        setLoading(false);
+      }
+    );
 
     return unsubscribe;
   }, [user?.uid]);
@@ -158,17 +155,19 @@ export default function AddressesScreen() {
     setSaving(true);
     try {
       if (editingAddress) {
-        const addressRef = doc(db, "addresses", editingAddress.id);
-        await updateDoc(addressRef, {
-          ...formData,
-          updatedAt: Timestamp.now(),
-        });
+        await firestore()
+          .collection("addresses")
+          .doc(editingAddress.id)
+          .update({
+            ...formData,
+            updatedAt: firestore.FieldValue.serverTimestamp(),
+          });
         Alert.alert("Success", "Address updated successfully");
       } else {
-        await addDoc(collection(db, "addresses"), {
+        await firestore().collection("addresses").add({
           ...formData,
           userId: user.uid,
-          createdAt: Timestamp.now(),
+          createdAt: firestore.FieldValue.serverTimestamp(),
         });
         Alert.alert("Success", "Address added successfully");
       }
@@ -183,31 +182,44 @@ export default function AddressesScreen() {
   };
 
   const handleDelete = (address: Address) => {
-    Alert.alert("Delete Address", `Are you sure you want to delete ${address.label}?`, [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Delete",
-        style: "destructive",
-        onPress: async () => {
-          try {
-            await deleteDoc(doc(db, "addresses", address.id));
-            Alert.alert("Success", "Address deleted");
-          } catch (error) {
-            Alert.alert("Error", "Failed to delete address");
-          }
+    Alert.alert(
+      "Delete Address",
+      `Are you sure you want to delete ${address.label}?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await firestore()
+                .collection("addresses")
+                .doc(address.id)
+                .delete();
+              Alert.alert("Success", "Address deleted");
+            } catch (error) {
+              Alert.alert("Error", "Failed to delete address");
+            }
+          },
         },
-      },
-    ]);
+      ]
+    );
   };
 
   const handleSetDefault = async (address: Address) => {
     try {
-      for (const addr of addresses) {
-        if (addr.isDefault && addr.id !== address.id) {
-          await updateDoc(doc(db, "addresses", addr.id), { isDefault: false });
+      const batch = firestore().batch();
+
+      addresses.forEach(addr => {
+        const ref = firestore().collection("addresses").doc(addr.id);
+        if (addr.id === address.id) {
+          batch.update(ref, { isDefault: true });
+        } else if (addr.isDefault) {
+          batch.update(ref, { isDefault: false });
         }
-      }
-      await updateDoc(doc(db, "addresses", address.id), { isDefault: true });
+      });
+
+      await batch.commit();
       Alert.alert("Success", "Default address updated");
     } catch (error) {
       Alert.alert("Error", "Failed to set default address");
@@ -241,7 +253,9 @@ export default function AddressesScreen() {
           <View style={styles.emptyState}>
             <Ionicons name="location-outline" size={80} color="#e0e0e0" />
             <Text style={styles.emptyText}>No addresses added yet</Text>
-            <Text style={styles.emptySubtext}>Add your first address to get started</Text>
+            <Text style={styles.emptySubtext}>
+              Add your first address to get started
+            </Text>
           </View>
         ) : (
           addresses.map(address => (
@@ -253,8 +267,8 @@ export default function AddressesScreen() {
                       address.label === "Home"
                         ? "home"
                         : address.label === "Work"
-                          ? "business"
-                          : "location"
+                        ? "business"
+                        : "location"
                     }
                     size={20}
                     color="#007AFF"
@@ -267,7 +281,10 @@ export default function AddressesScreen() {
                   )}
                 </View>
                 <View style={styles.addressActions}>
-                  <TouchableOpacity onPress={() => handleEdit(address)} style={styles.actionButton}>
+                  <TouchableOpacity
+                    onPress={() => handleEdit(address)}
+                    style={styles.actionButton}
+                  >
                     <Ionicons name="pencil" size={18} color="#007AFF" />
                   </TouchableOpacity>
                   <TouchableOpacity
@@ -352,7 +369,9 @@ export default function AddressesScreen() {
                 <TextInput
                   style={styles.input}
                   value={formData.name}
-                  onChangeText={(text: string) => setFormData({ ...formData, phone: text })}
+                  onChangeText={text =>
+                    setFormData({ ...formData, name: text })
+                  }
                   placeholder="Enter full name"
                   placeholderTextColor="#999"
                 />
@@ -363,7 +382,9 @@ export default function AddressesScreen() {
                 <TextInput
                   style={styles.input}
                   value={formData.phone}
-                  onChangeText={(text:string) => setFormData({ ...formData, phone: text })}
+                  onChangeText={text =>
+                    setFormData({ ...formData, phone: text })
+                  }
                   placeholder="Enter 10-digit phone number"
                   placeholderTextColor="#999"
                   keyboardType="phone-pad"
@@ -376,7 +397,9 @@ export default function AddressesScreen() {
                 <TextInput
                   style={[styles.input, styles.textArea]}
                   value={formData.street}
-                  onChangeText={(text:string) => setFormData({ ...formData, street: text })}
+                  onChangeText={text =>
+                    setFormData({ ...formData, street: text })
+                  }
                   placeholder="House/Flat no., Building name, Street"
                   placeholderTextColor="#999"
                   multiline
@@ -390,7 +413,9 @@ export default function AddressesScreen() {
                   <TextInput
                     style={styles.input}
                     value={formData.city}
-                    onChangeText={(text:string) => setFormData({ ...formData, city: text })}
+                    onChangeText={text =>
+                      setFormData({ ...formData, city: text })
+                    }
                     placeholder="City"
                     placeholderTextColor="#999"
                   />
@@ -401,7 +426,9 @@ export default function AddressesScreen() {
                   <TextInput
                     style={styles.input}
                     value={formData.pincode}
-                    onChangeText={(text:string) => setFormData({ ...formData, pincode: text })}
+                    onChangeText={text =>
+                      setFormData({ ...formData, pincode: text })
+                    }
                     placeholder="6-digit pincode"
                     placeholderTextColor="#999"
                     keyboardType="number-pad"
@@ -415,7 +442,9 @@ export default function AddressesScreen() {
                 <TextInput
                   style={styles.input}
                   value={formData.state}
-                  onChangeText={(text:string) => setFormData({ ...formData, state: text })}
+                  onChangeText={text =>
+                    setFormData({ ...formData, state: text })
+                  }
                   placeholder="State"
                   placeholderTextColor="#999"
                 />
@@ -423,14 +452,21 @@ export default function AddressesScreen() {
 
               <TouchableOpacity
                 style={styles.defaultCheckbox}
-                onPress={() => setFormData({ ...formData, isDefault: !formData.isDefault })}
+                onPress={() =>
+                  setFormData({
+                    ...formData,
+                    isDefault: !formData.isDefault,
+                  })
+                }
               >
                 <Ionicons
                   name={formData.isDefault ? "checkbox" : "square-outline"}
                   size={24}
                   color="#007AFF"
                 />
-                <Text style={styles.defaultCheckboxText}>Set as default address</Text>
+                <Text style={styles.defaultCheckboxText}>
+                  Set as default address
+                </Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -453,6 +489,7 @@ export default function AddressesScreen() {
     </SafeAreaView>
   );
 }
+
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#f8f9fa" },

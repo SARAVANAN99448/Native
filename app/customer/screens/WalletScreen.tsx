@@ -15,24 +15,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../../contexts/AuthContext';
-import {
-  collection,
-  addDoc,
-  doc,
-  query,
-  where,
-  orderBy,
-  getDocs,
-  getDoc,
-  setDoc,
-  Timestamp,
-  updateDoc
-} from 'firebase/firestore';
-import { db } from '../../../config/firebaseConfig';
+import firestore from '@react-native-firebase/firestore';
 import RazorpayCheckout, {
   RazorpaySuccessResponse,
   RazorpayErrorResponse
-} from 'react-native-razorpay'; // ✅ Mobile-only
+} from 'react-native-razorpay';
 
 type Transaction = {
   id: string;
@@ -52,19 +39,19 @@ type WalletData = {
 };
 
 type IoniconName =
-  | "gift"
-  | "sync"
-  | "card"
-  | "refresh"
-  | "arrow-back"
-  | "help-circle-outline"
-  | "add-circle"
-  | "arrow-forward"
-  | "shield-checkmark"
-  | "flash"
-  | "receipt-outline"
-  | "arrow-down"
-  | "arrow-up";
+  | 'gift'
+  | 'sync'
+  | 'card'
+  | 'refresh'
+  | 'arrow-back'
+  | 'help-circle-outline'
+  | 'add-circle'
+  | 'arrow-forward'
+  | 'shield-checkmark'
+  | 'flash'
+  | 'receipt-outline'
+  | 'arrow-down'
+  | 'arrow-up';
 
 export default function WalletScreen() {
   const { user } = useAuth();
@@ -92,17 +79,17 @@ export default function WalletScreen() {
       return;
     }
     try {
-      const walletRef = doc(db, 'wallets', user.uid);
-      const walletSnap = await getDoc(walletRef);
+      const walletRef = firestore().collection('wallets').doc(user.uid);
+      const walletSnap = await walletRef.get();
+      const data = walletSnap.data() as WalletData | undefined;
 
-      if (walletSnap.exists()) {
-        const data = walletSnap.data() as WalletData;
+      if (data) {
         setBalance(data.balance || 0);
       } else {
-        await setDoc(walletRef, {
+        await walletRef.set({
           userId: user.uid,
           balance: 0,
-          updatedAt: Timestamp.now(),
+          updatedAt: firestore.FieldValue.serverTimestamp(),
         });
         setBalance(0);
       }
@@ -120,30 +107,28 @@ export default function WalletScreen() {
       return;
     }
     try {
-      const transactionsRef = collection(db, 'transactions');
-      const q = query(
-        transactionsRef,
-        where('userId', '==', user.uid),
-        orderBy('createdAt', 'desc')
-      );
-      const snapshot = await getDocs(q);
-      const txnList: Transaction[] = [];
-      snapshot.forEach((doc) => {
-        txnList.push({ id: doc.id, ...doc.data() } as Transaction);
-      });
+      const q = firestore()
+        .collection('transactions')
+        .where('userId', '==', user.uid)
+        .orderBy('createdAt', 'desc');
+
+      const snapshot = await q.get();
+      const txnList: Transaction[] = snapshot.docs.map(d => ({
+        id: d.id,
+        ...(d.data() as any),
+      }));
       setTransactions(txnList);
     } catch (error) {
       console.error('Error loading transactions:', error);
       try {
-        const q2 = query(
-          collection(db, 'transactions'),
-          where('userId', '==', user.uid)
-        );
-        const snapshot = await getDocs(q2);
-        const txnList: Transaction[] = [];
-        snapshot.forEach((doc) => {
-          txnList.push({ id: doc.id, ...doc.data() } as Transaction);
-        });
+        const q2 = firestore()
+          .collection('transactions')
+          .where('userId', '==', user.uid);
+        const snapshot = await q2.get();
+        const txnList: Transaction[] = snapshot.docs.map(d => ({
+          id: d.id,
+          ...(d.data() as any),
+        }));
         setTransactions(txnList);
       } catch (error2) {
         console.error('Error loading transactions (fallback):', error2);
@@ -158,7 +143,6 @@ export default function WalletScreen() {
     setAddAmount(amount.toString());
   };
 
-  // ✅ MOBILE-ONLY: Razorpay Native SDK
   const handleAddMoney = async () => {
     const amount = parseInt(addAmount);
 
@@ -172,24 +156,29 @@ export default function WalletScreen() {
       return;
     }
 
+    if (!user?.uid) {
+      Alert.alert('Error', 'User not found');
+      return;
+    }
+
     setProcessing(true);
 
     try {
       const options = {
         key: 'rzp_test_YOUR_KEY_ID', // Replace with your test/live key
-        amount: amount * 100, // Amount in paise
+        amount: amount * 100,
         currency: 'INR',
         name: 'Vint Services',
         description: 'Add money to wallet',
-        image: '', // Add your app logo URL
+        image: '',
         prefill: {
           name: user?.name || '',
           email: user?.email || '',
-          contact: user?.phone || '',
+          contact: (user as any)?.phone || '',
         },
         notes: {
           purpose: 'wallet_recharge',
-          userId: user!.uid,
+          userId: user.uid,
         },
         theme: {
           color: '#667eea',
@@ -198,31 +187,32 @@ export default function WalletScreen() {
 
       RazorpayCheckout.open(options)
         .then(async (data: RazorpaySuccessResponse) => {
-          // ✅ Server-side verification recommended (Firebase Functions)
           console.log('✅ Payment Success:', data);
 
-          // Update wallet balance
-          const walletRef = doc(db, 'wallets', user!.uid);
-          const walletSnap = await getDoc(walletRef);
-          const currentBalance = walletSnap.exists() ? walletSnap.data()?.balance || 0 : 0;
+          const walletRef = firestore().collection('wallets').doc(user.uid);
+          const walletSnap = await walletRef.get();
+          const walletData = walletSnap.data() as WalletData | undefined;
+          const currentBalance = walletData?.balance || 0;
 
-          await updateDoc(walletRef, {
+          await walletRef.update({
             balance: currentBalance + amount,
-            updatedAt: Timestamp.now(),
+            updatedAt: firestore.FieldValue.serverTimestamp(),
           });
 
-          // Add transaction record
-          await addDoc(collection(db, 'transactions'), {
-            userId: user!.uid,
+          await firestore().collection('transactions').add({
+            userId: user.uid,
             type: 'credit' as const,
-            amount: amount,
+            amount,
             description: 'Money added to wallet',
             status: 'completed',
             referenceId: data.razorpay_payment_id,
-            createdAt: Timestamp.now(),
+            createdAt: firestore.FieldValue.serverTimestamp(),
           });
 
-          Alert.alert('Success', `₹${amount.toLocaleString('en-IN')} added to your wallet!`);
+          Alert.alert(
+            'Success',
+            `₹${amount.toLocaleString('en-IN')} added to your wallet!`
+          );
           setShowAddMoneyModal(false);
           setAddAmount('');
           loadWalletData();
@@ -230,16 +220,15 @@ export default function WalletScreen() {
         })
         .catch(async (error: RazorpayErrorResponse) => {
           console.error('❌ Payment Error:', error);
-          
-          // Log failed attempt
-          await addDoc(collection(db, 'transactions'), {
-            userId: user!.uid,
+
+          await firestore().collection('transactions').add({
+            userId: user.uid,
             type: 'credit' as const,
-            amount: amount,
+            amount,
             description: 'Failed wallet recharge',
             status: 'failed',
             referenceId: error.code || null,
-            createdAt: Timestamp.now(),
+            createdAt: firestore.FieldValue.serverTimestamp(),
           });
 
           if (error.code !== 'E_CANCELLED') {
@@ -285,10 +274,16 @@ export default function WalletScreen() {
           />
         </View>
         <View style={styles.transactionDetails}>
-          <Text style={styles.transactionDescription}>{transaction.description}</Text>
-          <Text style={styles.transactionDate}>{formatDate(transaction.createdAt)}</Text>
+          <Text style={styles.transactionDescription}>
+            {transaction.description}
+          </Text>
+          <Text style={styles.transactionDate}>
+            {formatDate(transaction.createdAt)}
+          </Text>
           {transaction.referenceId && (
-            <Text style={styles.transactionRef}>Ref: {transaction.referenceId.slice(0, 12)}...</Text>
+            <Text style={styles.transactionRef}>
+              Ref: {transaction.referenceId.slice(0, 12)}...
+            </Text>
           )}
         </View>
         <View style={styles.transactionAmount}>
@@ -298,7 +293,8 @@ export default function WalletScreen() {
               { color: isCredit ? '#34C759' : '#FF3B30' },
             ]}
           >
-            {isCredit ? '+' : '-'}₹{transaction.amount.toLocaleString('en-IN')}
+            {isCredit ? '+' : '-'}₹
+            {transaction.amount.toLocaleString('en-IN')}
           </Text>
           {transaction.status === 'pending' && (
             <Text style={styles.pendingText}>Pending</Text>
@@ -324,7 +320,6 @@ export default function WalletScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header with Gradient */}
       <LinearGradient
         colors={['#667eea', '#764ba2']}
         start={{ x: 0, y: 0 }}
@@ -340,7 +335,6 @@ export default function WalletScreen() {
         </TouchableOpacity>
       </LinearGradient>
 
-      {/* Balance Card with Gradient */}
       <LinearGradient
         colors={['#667eea', '#764ba2']}
         start={{ x: 0, y: 0 }}
@@ -353,7 +347,9 @@ export default function WalletScreen() {
           </View>
           <View style={styles.balanceInfo}>
             <Text style={styles.balanceLabel}>Available Balance</Text>
-            <Text style={styles.balanceAmount}>₹{balance.toLocaleString('en-IN')}</Text>
+            <Text style={styles.balanceAmount}>
+              ₹{balance.toLocaleString('en-IN')}
+            </Text>
           </View>
         </View>
         <TouchableOpacity
@@ -365,15 +361,24 @@ export default function WalletScreen() {
         </TouchableOpacity>
       </LinearGradient>
 
-      {/* Quick Actions */}
       <View style={styles.quickActions}>
         {[
-          { icon: "gift", color: "#FF9500", bg: "#FFF5E6", text: "Rewards" },
-          { icon: "sync", color: "#007AFF", bg: "#E6F2FF", text: "Transfer" },
-          { icon: "card", color: "#34C759", bg: "#E6FFF0", text: "Withdraw" },
-          { icon: "refresh", color: "#FF3B30", bg: "#FFE6E6", text: "Refresh", cb: loadTransactions }
+          { icon: 'gift', color: '#FF9500', bg: '#FFF5E6', text: 'Rewards' },
+          { icon: 'sync', color: '#007AFF', bg: '#E6F2FF', text: 'Transfer' },
+          { icon: 'card', color: '#34C759', bg: '#E6FFF0', text: 'Withdraw' },
+          {
+            icon: 'refresh',
+            color: '#FF3B30',
+            bg: '#FFE6E6',
+            text: 'Refresh',
+            cb: loadTransactions,
+          },
         ].map(({ icon, color, bg, text, cb }) => (
-          <TouchableOpacity key={text} style={styles.quickAction} onPress={cb || (() => {})}>
+          <TouchableOpacity
+            key={text}
+            style={styles.quickAction}
+            onPress={cb || (() => {})}
+          >
             <View style={[styles.quickActionIcon, { backgroundColor: bg }]}>
               <Ionicons name={icon as IoniconName} size={24} color={color} />
             </View>
@@ -382,8 +387,10 @@ export default function WalletScreen() {
         ))}
       </View>
 
-      {/* Transactions */}
-      <ScrollView style={styles.transactionsContainer} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.transactionsContainer}
+        showsVerticalScrollIndicator={false}
+      >
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Recent Transactions</Text>
           <TouchableOpacity onPress={loadTransactions}>
@@ -394,7 +401,9 @@ export default function WalletScreen() {
           <View style={styles.emptyState}>
             <Ionicons name="receipt-outline" size={80} color="#e0e0e0" />
             <Text style={styles.emptyText}>No transactions yet</Text>
-            <Text style={styles.emptySubtext}>Your wallet transactions will appear here</Text>
+            <Text style={styles.emptySubtext}>
+              Your wallet transactions will appear here
+            </Text>
           </View>
         ) : (
           <View style={styles.transactionsList}>
@@ -403,7 +412,6 @@ export default function WalletScreen() {
         )}
       </ScrollView>
 
-      {/* Add Money Modal */}
       <Modal visible={showAddMoneyModal} transparent animationType="slide">
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
@@ -418,7 +426,7 @@ export default function WalletScreen() {
               <TextInput
                 style={styles.amountInput}
                 value={addAmount}
-                onChangeText={(text:string) => {
+                onChangeText={(text: string) => {
                   if (/^\d*$/.test(text)) {
                     setAddAmount(text);
                   }
@@ -431,19 +439,21 @@ export default function WalletScreen() {
             </View>
             <Text style={styles.quickAmountLabel}>Quick Add</Text>
             <View style={styles.quickAmountContainer}>
-              {quickAmounts.map((amount) => (
+              {quickAmounts.map(amount => (
                 <TouchableOpacity
                   key={amount}
                   style={[
                     styles.quickAmountButton,
-                    addAmount === amount.toString() && styles.quickAmountButtonActive,
+                    addAmount === amount.toString() &&
+                      styles.quickAmountButtonActive,
                   ]}
                   onPress={() => handleQuickAmount(amount)}
                 >
                   <Text
                     style={[
                       styles.quickAmountText,
-                      addAmount === amount.toString() && styles.quickAmountTextActive,
+                      addAmount === amount.toString() &&
+                        styles.quickAmountTextActive,
                     ]}
                   >
                     ₹{amount}
@@ -453,7 +463,11 @@ export default function WalletScreen() {
             </View>
             <View style={styles.benefitsContainer}>
               <View style={styles.benefitItem}>
-                <Ionicons name="shield-checkmark" size={20} color="#34C759" />
+                <Ionicons
+                  name="shield-checkmark"
+                  size={20}
+                  color="#34C759"
+                />
                 <Text style={styles.benefitText}>100% Secure</Text>
               </View>
               <View style={styles.benefitItem}>
@@ -493,20 +507,9 @@ export default function WalletScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f8f9fa',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: '#666',
-  },
+  container: { flex: 1, backgroundColor: '#f8f9fa' },
+  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  loadingText: { marginTop: 16, fontSize: 16, color: '#666' },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -522,11 +525,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#fff',
-  },
+  headerTitle: { fontSize: 18, fontWeight: '700', color: '#fff' },
   helpButton: {
     width: 40,
     height: 40,
@@ -560,9 +559,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginRight: 16,
   },
-  balanceInfo: {
-    flex: 1,
-  },
+  balanceInfo: { flex: 1 },
   balanceLabel: {
     fontSize: 14,
     color: 'rgba(255, 255, 255, 0.9)',
@@ -598,9 +595,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 24,
   },
-  quickAction: {
-    alignItems: 'center',
-  },
+  quickAction: { alignItems: 'center' },
   quickActionIcon: {
     width: 56,
     height: 56,
@@ -614,31 +609,16 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
   },
-  quickActionText: {
-    fontSize: 12,
-    color: '#333',
-    fontWeight: '500',
-  },
-  transactionsContainer: {
-    flex: 1,
-    paddingHorizontal: 20,
-  },
+  quickActionText: { fontSize: 12, color: '#333', fontWeight: '500' },
+  transactionsContainer: { flex: 1, paddingHorizontal: 20 },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 16,
   },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#333',
-  },
-  viewAllText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#667eea',
-  },
+  sectionTitle: { fontSize: 18, fontWeight: '700', color: '#333' },
+  viewAllText: { fontSize: 14, fontWeight: '600', color: '#667eea' },
   emptyState: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -650,14 +630,8 @@ const styles = StyleSheet.create({
     color: '#333',
     marginTop: 16,
   },
-  emptySubtext: {
-    fontSize: 14,
-    color: '#666',
-    marginTop: 8,
-  },
-  transactionsList: {
-    paddingBottom: 20,
-  },
+  emptySubtext: { fontSize: 14, color: '#666', marginTop: 8 },
+  transactionsList: { paddingBottom: 20 },
   transactionCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -679,41 +653,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginRight: 12,
   },
-  transactionDetails: {
-    flex: 1,
-  },
+  transactionDetails: { flex: 1 },
   transactionDescription: {
     fontSize: 15,
     fontWeight: '600',
     color: '#333',
     marginBottom: 4,
   },
-  transactionDate: {
-    fontSize: 13,
-    color: '#666',
-  },
-  transactionRef: {
-    fontSize: 11,
-    color: '#999',
-    marginTop: 2,
-  },
-  transactionAmount: {
-    alignItems: 'flex-end',
-  },
-  amountText: {
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  pendingText: {
-    fontSize: 11,
-    color: '#FF9500',
-    marginTop: 4,
-  },
-  failedText: {
-    fontSize: 11,
-    color: '#FF3B30',
-    marginTop: 4,
-  },
+  transactionDate: { fontSize: 13, color: '#666' },
+  transactionRef: { fontSize: 11, color: '#999', marginTop: 2 },
+  transactionAmount: { alignItems: 'flex-end' },
+  amountText: { fontSize: 16, fontWeight: '700' },
+  pendingText: { fontSize: 11, color: '#FF9500', marginTop: 4 },
+  failedText: { fontSize: 11, color: '#FF3B30', marginTop: 4 },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
@@ -733,11 +685,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 24,
   },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#333',
-  },
+  modalTitle: { fontSize: 20, fontWeight: '700', color: '#333' },
   amountInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -786,23 +734,14 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#666',
   },
-  quickAmountTextActive: {
-    color: '#fff',
-  },
+  quickAmountTextActive: { color: '#fff' },
   benefitsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-around',
     marginBottom: 24,
   },
-  benefitItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  benefitText: {
-    fontSize: 13,
-    color: '#666',
-  },
+  benefitItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  benefitText: { fontSize: 13, color: '#666' },
   proceedButton: {
     borderRadius: 12,
     marginBottom: 12,
@@ -819,14 +758,6 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     gap: 8,
   },
-  proceedButtonText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#fff',
-  },
-  paymentNote: {
-    fontSize: 12,
-    color: '#999',
-    textAlign: 'center',
-  },
+  proceedButtonText: { fontSize: 16, fontWeight: '700', color: '#fff' },
+  paymentNote: { fontSize: 12, color: '#999', textAlign: 'center' },
 });

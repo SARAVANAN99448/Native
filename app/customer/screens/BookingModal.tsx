@@ -15,15 +15,7 @@ import { useRouter } from "expo-router";
 import { useAuth } from "../../../contexts/AuthContext";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import {
-  collection,
-  addDoc,
-  getDocs,
-  query,
-  where,
-  Timestamp,
-} from "firebase/firestore";
-import { db } from "../../../config/firebaseConfig";
+import firestore from "@react-native-firebase/firestore";
 import { useFocusEffect } from "@react-navigation/native";
 
 type Address = {
@@ -93,14 +85,15 @@ export default function BookingModal() {
   const loadAddresses = async () => {
     if (!user?.uid) return;
     try {
-      const addressesRef = collection(db, "addresses");
-      const q = query(addressesRef, where("userId", "==", user.uid));
-      const snapshot = await getDocs(q);
+      const snap = await firestore()
+        .collection("addresses")
+        .where("userId", "==", user.uid)
+        .get();
 
-      const list: Address[] = [];
-      snapshot.forEach(d => {
-        list.push({ id: d.id, ...d.data() } as Address);
-      });
+      const list: Address[] = snap.docs.map(d => ({
+        id: d.id,
+        ...(d.data() as any),
+      }));
 
       setAddresses(list);
       if (list.length > 0) {
@@ -153,12 +146,12 @@ export default function BookingModal() {
           state: selectedAddress.state,
           pincode: selectedAddress.pincode,
         },
-        createdAt: Timestamp.now(),
+        createdAt: firestore.FieldValue.serverTimestamp(),
         providerId: null,
         providerName: null,
       };
 
-      await addDoc(collection(db, "bookings"), bookingData);
+      await firestore().collection("bookings").add(bookingData);
 
       Alert.alert("Success!", "Your booking has been created successfully!", [
         {
@@ -272,7 +265,7 @@ export default function BookingModal() {
               mode="date"
               display="default"
               minimumDate={new Date()}
-              onChange={(event:any, selectedDate?: Date | undefined) => {
+              onChange={(event: any, selectedDate?: Date) => {
                 setShowDatePicker(false);
                 if (selectedDate) setBookingDate(selectedDate);
               }}
@@ -371,6 +364,8 @@ export default function BookingModal() {
     </SafeAreaView>
   );
 }
+
+
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F8F9FD" },
