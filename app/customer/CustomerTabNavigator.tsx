@@ -28,12 +28,13 @@ export default function CustomerTabNavigator() {
 
           return <Ionicons name={iconName} size={size} color={color} />;
         },
-        tabBarActiveTintColor: '#007AFF',
+        tabBarActiveTintColor: '#e68123',
         tabBarInactiveTintColor: 'gray',
         headerShown: false,
         tabBarStyle: {
-          paddingBottom: Platform.OS === 'ios' ? 20 : 10,
-          height: Platform.OS === 'ios' ? 80 : 60,
+          paddingBottom: Platform.OS === 'ios' ? 80 : 40,
+          height: Platform.OS === 'ios' ? 60 : 80,
+           
         },
       })}
     >

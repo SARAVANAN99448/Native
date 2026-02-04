@@ -13,11 +13,14 @@ import {
   StatusBar,
   FlatList,
   Modal,
+  ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "../../../contexts/AuthContext";
 import { router } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Video } from "expo-av";
+import firestore from "@react-native-firebase/firestore";
 
 const { width } = Dimensions.get("window");
 const IMAGE_WIDTH = width * 0.75;
@@ -34,14 +37,14 @@ type Service = {
   duration: number;
   rating: number;
   reviews: number;
-  image: string;
+  image: any;
   discount?: number;
   popular?: boolean;
 };
 
 type BannerImage = {
   id: string;
-  image: string;
+  image: any;
   title: string;
 };
 
@@ -50,6 +53,7 @@ type VideoItem = {
   thumbnail: string;
   title: string;
   duration: string;
+  videoUrl: string | number;
 };
 
 type Address = {
@@ -69,17 +73,47 @@ export default function HomeScreen() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [bannerImages, setBannerImages] = useState<BannerImage[]>([]);
   const [videos, setVideos] = useState<VideoItem[]>([]);
-
+  const [selectedVideo, setSelectedVideo] = useState<VideoItem | null>(null);
   const [showLocationModal, setShowLocationModal] = useState(false);
-  const [savedAddresses, setSavedAddresses] = useState<Address[]>([
-    { id: "1", label: "Home", address: "MG Road, Bangalore", isDefault: true },
-    { id: "2", label: "Work", address: "Koramangala, Bangalore", isDefault: false },
-  ]);
-  const [selectedAddress, setSelectedAddress] = useState<Address>(savedAddresses[0]);
+
+  const [savedAddresses, setSavedAddresses] = useState<any[]>([]);
+  const [selectedAddress, setSelectedAddress] = useState<any>({ label: "Select Location", mainAddress: "Set your address" });
+  const [addrLoading, setAddrLoading] = useState(true);
   const [favorites, setFavorites] = useState<string[]>([]);
 
   const [showNamePrompt, setShowNamePrompt] = useState(false);
   const namePromptTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (!user?.uid) return;
+
+    const unsubscribe = firestore()
+      .collection("addresses")
+      .where("userId", "==", user.uid)
+      .orderBy("createdAt", "desc")
+      .onSnapshot(
+        (querySnapshot) => {
+          const addresses = querySnapshot.docs.map((doc) => ({
+            id: doc.id,
+            ...doc.data(),
+          }));
+          setSavedAddresses(addresses);
+
+          // Set default selected address if none selected yet
+          if (addresses.length > 0 && selectedAddress.label === "Select Location") {
+            setSelectedAddress(addresses[0]);
+          }
+          setAddrLoading(false);
+        },
+        (error) => {
+          console.error("Error fetching addresses:", error);
+          setAddrLoading(false);
+        }
+      );
+
+    return () => unsubscribe();
+  }, [user?.uid]);
+
 
   useEffect(() => {
     loadData();
@@ -116,28 +150,20 @@ export default function HomeScreen() {
       const bannerList: BannerImage[] = [
         {
           id: "1",
-          image:
-            "https://images.unsplash.com/photo-1621905251189-08b45d6a269e?w=900&h=500&fit=crop&q=80",
-          title: "Summer Sale",
+          image: require("../../../assets/images/new-year.png"),
+          title: "New year",
         },
         {
           id: "2",
-          image:
-            "https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=900&h=500&fit=crop&q=80",
+          image: require("../../../assets/images/pongal.png"),
           title: "Deep Cleaning Offer",
         },
         {
           id: "3",
-          image:
-            "https://images.unsplash.com/photo-1560066984-138dadb4c035?w=900&h=500&fit=crop&q=80",
-          title: "Beauty Services",
+          image: require("../../../assets/images/zero-eb-bill.png"),
+          title: "Zero EB-Bill",
         },
-        {
-          id: "4",
-          image:
-            "https://images.unsplash.com/photo-1635274853671-e5ce921b5264?w=900&h=500&fit=crop&q=80",
-          title: "AC Service Deal",
-        },
+
       ];
 
       const videoList: VideoItem[] = [
@@ -145,51 +171,82 @@ export default function HomeScreen() {
           id: "1",
           thumbnail:
             "https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=400&h=600&fit=crop&q=80",
-          title: "How We Clean Your Home",
+          title: "Efficient Solar Panel Inspection",
           duration: "2:30",
+          videoUrl: require("../../../assets/videos/v1.mp4"),
         },
         {
           id: "2",
           thumbnail:
             "https://images.unsplash.com/photo-1560066984-138dadb4c035?w=400&h=600&fit=crop&q=80",
-          title: "Salon Services at Home",
+          title: " Maintaining Solar Panels",
           duration: "1:45",
+          videoUrl: require("../../../assets/videos/v2.mp4"),
         },
         {
           id: "3",
           thumbnail:
             "https://images.unsplash.com/photo-1621905251189-08b45d6a269e?w=400&h=600&fit=crop&q=80",
-          title: "AC Repair Guide",
+          title: "Engineers Reviewing Photovoltaic Installations",
           duration: "3:10",
+          videoUrl: require("../../../assets/videos/v3.mp4")
         },
         {
           id: "4",
           thumbnail:
             "https://images.unsplash.com/photo-1621905252507-b35492cc74b4?w=400&h=600&fit=crop&q=80",
-          title: "Safety Tips & Guidelines",
+          title: "Solar Panels Monitoring With Digital Tools",
           duration: "2:15",
+          videoUrl: require("../../../assets/videos/v4.mp4"),
         },
         {
           id: "5",
           thumbnail:
             "https://images.unsplash.com/photo-1607472586893-edb57bdc0e39?w=400&h=600&fit=crop&q=80",
-          title: "Plumbing Solutions",
+          title: "Testing Solar Panels With Multimeter and Tools",
           duration: "1:55",
+          videoUrl: require("../../../assets/videos/v5.mp4"),
         },
       ];
+
 
       const serviceList: Service[] = [
         {
           id: "1",
-          name: "AC Service & Gas Refill",
-          category: "AC Repair",
-          description: "Complete AC checkup with gas refill and cooling restoration",
-          price: 899,
+          name: "Once time visit",
+          category: "Solar",
+          description: "Complete solar maintenance with cleaning, fault checks and performance tuning",
+          price: 2999,
           duration: 150,
           rating: 4.76,
           reviews: 470000,
-          image:
-            "https://images.unsplash.com/photo-1621905251189-08b45d6a269e?w=800&h=600&fit=crop&q=80",
+          image: require("../../../assets/images/one.png"),
+          discount: 25,
+          popular: true,
+        },
+        {
+          id: "2",
+          name: "2 visits / year",
+          category: "Solar",
+          description: "Complete solar maintenance with cleaning, fault checks and performance tuning",
+          price: 5499,
+          duration: 150,
+          rating: 4.76,
+          reviews: 470000,
+          image: require("../../../assets/images/two.png"),
+          discount: 25,
+          popular: true,
+        },
+        {
+          id: "3",
+          name: "4 visits / year",
+          category: "Solar",
+          description: "Complete solar maintenance with cleaning, fault checks and performance tuning",
+          price: 9999,
+          duration: 150,
+          rating: 4.76,
+          reviews: 470000,
+          image: require("../../../assets/images/four.png"),
           discount: 25,
           popular: true,
         },
@@ -236,11 +293,17 @@ export default function HomeScreen() {
   const handleLocationPress = () => {
     setShowLocationModal(true);
   };
-
-  const handleAddressSelect = (address: Address) => {
+  const handlecalculator = () => {
+    router.push("/customer/screens/SolarCalculator");
+  }
+   const handleBookVisit = () => {
+    router.push("/customer/screens/BookVisit");
+  }
+  const handleAddressSelect = (address: any) => {
     setSelectedAddress(address);
     setShowLocationModal(false);
-    Alert.alert("Location Changed", `Showing services for ${address.label}`);
+    // Optionally save to AsyncStorage to persist selection across app restarts
+    AsyncStorage.setItem("lastSelectedAddress", JSON.stringify(address));
   };
 
   const handleAddNewAddress = () => {
@@ -274,12 +337,12 @@ export default function HomeScreen() {
     }
   };
 
-  const handleRepeatBooking = () => {
-    router.push("/customer/screens/BookingsScreen");
-  };
+  // const handleRepeatBooking = () => {
+  //   router.push("/customer/screens/BookingsScreen");
+  // };
 
   const handleOffersPress = () => {
-    Alert.alert("Offers", "View all available offers and discounts");
+    Alert.alert("Offers", "Scroll down to view offers");
   };
 
   const handleMyBookingsPress = () => {
@@ -303,43 +366,54 @@ export default function HomeScreen() {
     Alert.alert("Special Offer", banner.title);
   };
 
-  const handleVideoPress = (video: VideoItem) => {
-    Alert.alert("Video", video.title);
+  const handleVideoPress = (item: VideoItem) => {
+    setSelectedVideo(item);
   };
 
   const renderBannerItem = ({ item }: { item: BannerImage }) => (
-    <TouchableOpacity
-      style={styles.bannerItem}
-      activeOpacity={0.8}
-      onPress={() => handleBannerPress(item)}
-    >
-      <Image source={{ uri: item.image }} style={styles.bannerImage} resizeMode="cover" />
+    <View style={styles.bannerItem}>
+      <Image
+        source={item.image}
+        style={styles.bannerImage}
+        resizeMode="contain"
+      />
       <View style={styles.bannerOverlay}>
         <Text style={styles.bannerTitle}>{item.title}</Text>
       </View>
-    </TouchableOpacity>
+    </View>
   );
 
-  const renderVideoItem = ({ item }: { item: VideoItem }) => (
-    <TouchableOpacity
-      style={styles.videoItem}
-      activeOpacity={0.8}
-      onPress={() => handleVideoPress(item)}
-    >
-      <View style={styles.videoContainer}>
-        <Image source={{ uri: item.thumbnail }} style={styles.videoThumbnail} resizeMode="cover" />
-        <View style={styles.playButtonContainer}>
-          <Ionicons name="play-circle" size={48} color="#fff" />
-        </View>
-        <View style={styles.videoDurationBadge}>
+
+  const renderVideoItem = ({ item }: { item: VideoItem }) => {
+    const source =
+      typeof item.videoUrl === "string"
+        ? { uri: item.videoUrl }
+        : item.videoUrl; // require(...) case
+
+    return (
+      <View style={styles.videoItem}>
+        <View style={styles.videoContainer}>
+          <Video
+            source={source}
+            style={styles.videoThumbnail}
+            resizeMode="stretch"
+            shouldPlay
+            isLooping
+            isMuted
+            useNativeControls={false}  // hide player controls
+            usePoster={false}          // no static poster
+          />
+          {/* <View style={styles.videoDurationBadge}>
           <Text style={styles.videoDurationText}>{item.duration}</Text>
+        </View> */}
         </View>
+        <Text style={styles.videoTitle} numberOfLines={2}>
+          {item.title}
+        </Text>
       </View>
-      <Text style={styles.videoTitle} numberOfLines={2}>
-        {item.title}
-      </Text>
-    </TouchableOpacity>
-  );
+    );
+  };
+
 
   const renderServiceCard = (item: Service) => {
     const isFavorite = favorites.includes(item.id);
@@ -352,8 +426,8 @@ export default function HomeScreen() {
         onPress={() => handleServicePress(item)}
       >
         <View style={styles.imageContainer}>
-          <Image source={{ uri: item.image }} style={styles.serviceImage} resizeMode="cover" />
-          {item.discount && (
+          <Image source={item.image} style={styles.serviceImage} resizeMode="cover" />
+          {/* {item.discount && (
             <View style={styles.discountBadge}>
               <Text style={styles.discountText}>{item.discount}% OFF</Text>
             </View>
@@ -363,7 +437,7 @@ export default function HomeScreen() {
               <Ionicons name="flame" size={12} color="#fff" />
               <Text style={styles.popularText}>Popular</Text>
             </View>
-          )}
+          )} */}
           <TouchableOpacity
             style={styles.favoriteButton}
             onPress={(e: any) => {
@@ -385,11 +459,11 @@ export default function HomeScreen() {
               <Text style={styles.serviceName} numberOfLines={1}>
                 {item.name}
               </Text>
-              <View style={styles.ratingBadge}>
+              {/* <View style={styles.ratingBadge}>
                 <Ionicons name="star" size={12} color="#FFB800" />
                 <Text style={styles.ratingText}>{item.rating}</Text>
                 <Text style={styles.reviewsText}>({formatReviews(item.reviews)})</Text>
-              </View>
+              </View> */}
             </View>
           </View>
 
@@ -406,10 +480,10 @@ export default function HomeScreen() {
                 </Text>
               )}
             </View>
-            <View style={styles.durationBadge}>
+            {/* <View style={styles.durationBadge}>
               <Ionicons name="time-outline" size={14} color="#666" />
               <Text style={styles.durationText}>{item.duration} min</Text>
-            </View>
+            </View> */}
           </View>
 
           <TouchableOpacity
@@ -427,13 +501,13 @@ export default function HomeScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#fff" />
 
       {showNamePrompt && (
         <View style={styles.namePromptContainer}>
           <View style={styles.namePrompt}>
-            <Ionicons name="person-circle-outline" size={24} color="#6C3FE4" />
+            <Ionicons name="person-circle-outline" size={24} color="#e68123" />
             <Text style={styles.namePromptTitle}>Welcome!</Text>
             <Text style={styles.namePromptText}>
               Change your name in the Profile to personalize your experience
@@ -448,8 +522,10 @@ export default function HomeScreen() {
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <TouchableOpacity style={styles.locationContainer} onPress={handleLocationPress}>
-            <Ionicons name="location" size={20} color="#6C3FE4" />
-            <Text style={styles.locationText}>{selectedAddress.label}</Text>
+            <Ionicons name="location" size={20} color="#e68123" />
+            <Text style={styles.locationText} numberOfLines={1}>
+              {selectedAddress.label}
+            </Text>
             <Ionicons name="chevron-down" size={16} color="#333" />
           </TouchableOpacity>
           <Text style={styles.greeting}>Hey {user?.name || "User"}! 👋</Text>
@@ -490,24 +566,30 @@ export default function HomeScreen() {
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         <View style={styles.quickActionsBar}>
-          <TouchableOpacity style={styles.quickActionButton} onPress={handleRepeatBooking}>
-            <Ionicons name="repeat" size={20} color="#6C3FE4" />
+          {/* <TouchableOpacity style={styles.quickActionButton}
+          // onPress={handleRepeatBooking}
+          >
+            <Ionicons name="repeat" size={20} color="#e68123" />
             <Text style={styles.quickActionText}>Repeat</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.quickActionButton} onPress={handleOffersPress}>
             <Ionicons name="gift" size={20} color="#FF3B30" />
             <Text style={styles.quickActionText}>Offers</Text>
+          </TouchableOpacity> */}
+          <TouchableOpacity style={styles.quickActionButton} onPress={handlecalculator}>
+            <Ionicons name="calculator" size={20} color="#e68123" />
+            <Text style={styles.quickActionText}> Solar Calculator</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.quickActionButton} onPress={handleMyBookingsPress}>
-            <Ionicons name="calendar" size={20} color="#34C759" />
-            <Text style={styles.quickActionText}>My Bookings</Text>
+                    <TouchableOpacity style={styles.quickActionButton} onPress={handleBookVisit}>
+            <Ionicons name="call" size={20} color="#e68123" />
+            <Text style={styles.quickActionText}> Book visit</Text>
           </TouchableOpacity>
         </View>
 
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>
-              {selectedCategory ? `${selectedCategory} Services` : "Popular Services"}
+              {selectedCategory ? `${selectedCategory} Services` : "Solar Maintenance Services"}
             </Text>
           </View>
 
@@ -569,46 +651,59 @@ export default function HomeScreen() {
               </TouchableOpacity>
             </View>
 
-            {savedAddresses.map(address => (
-              <TouchableOpacity
-                key={address.id}
-                style={styles.addressItem}
-                onPress={() => handleAddressSelect(address)}
-              >
-                <View style={styles.addressIconContainer}>
-                  <Ionicons
-                    name={address.label === "Home" ? "home" : "business"}
-                    size={20}
-                    color="#6C3FE4"
-                  />
+            <ScrollView style={{ maxHeight: 400 }}>
+              {addrLoading ? (
+                <ActivityIndicator color="#e68123" style={{ margin: 20 }} />
+              ) : savedAddresses.length > 0 ? (
+                savedAddresses.map((address) => (
+                  <TouchableOpacity
+                    key={address.id}
+                    style={styles.addressItem}
+                    onPress={() => handleAddressSelect(address)}
+                  >
+                    <View style={styles.addressIconContainer}>
+                      <Ionicons
+                        name={address.label === "Home" ? "home" : "business"}
+                        size={20}
+                        color="#e68123"
+                      />
+                    </View>
+                    <View style={styles.addressInfo}>
+                      <Text style={styles.addressLabel}>{address.label}</Text>
+                      <Text style={styles.addressText} numberOfLines={1}>
+                        {address.addressDetails}, {address.mainAddress}
+                      </Text>
+                    </View>
+                    {selectedAddress.id === address.id && (
+                      <Ionicons name="checkmark-circle" size={24} color="#e68123" />
+                    )}
+                  </TouchableOpacity>
+                ))
+              ) : (
+                <View style={{ alignItems: "center", padding: 20 }}>
+                  <Text style={{ color: "#999" }}>No saved addresses found</Text>
                 </View>
-                <View style={styles.addressInfo}>
-                  <Text style={styles.addressLabel}>{address.label}</Text>
-                  <Text style={styles.addressText}>{address.address}</Text>
-                </View>
-                {selectedAddress.id === address.id && (
-                  <Ionicons name="checkmark-circle" size={24} color="#6C3FE4" />
-                )}
-              </TouchableOpacity>
-            ))}
+              )}
+            </ScrollView>
 
             <TouchableOpacity style={styles.addAddressButton} onPress={handleAddNewAddress}>
-              <Ionicons name="add-circle-outline" size={24} color="#6C3FE4" />
+              <Ionicons name="add-circle-outline" size={24} color="#e68123" />
               <Text style={styles.addAddressText}>Add New Address</Text>
             </TouchableOpacity>
           </View>
         </View>
       </Modal>
-    </SafeAreaView>
+
+    </View >
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F8F9FD" },
-  scrollContent: { paddingBottom: 24 },
+  scrollContent: { paddingBottom: 28 },
   namePromptContainer: {
     position: "absolute",
-    top: 0,
+    top: 100,
     left: 0,
     right: 0,
     zIndex: 1000,
@@ -641,7 +736,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   namePromptButton: {
-    backgroundColor: "#6C3FE4",
+    backgroundColor: "#e68123",
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 12,
@@ -656,7 +751,8 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "flex-start",
     paddingHorizontal: 20,
-    paddingVertical: 40,
+    paddingTop: 45,        // Top padding for status bar area
+    paddingBottom: 10,
     backgroundColor: "#fff",
   },
   headerLeft: { flex: 1 },
@@ -742,7 +838,7 @@ const styles = StyleSheet.create({
     shadowRadius: 3,
     elevation: 2,
   },
-  quickActionText: { fontSize: 11, fontWeight: "600", color: "#333" },
+  quickActionText: { fontSize: 15, fontWeight: "bold", color: "#333"},
   section: { marginTop: 24 },
   sectionHeader: {
     flexDirection: "row",
@@ -766,10 +862,10 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    backgroundColor: "rgba(82, 71, 67, 0.5)",
     padding: 16,
   },
-  bannerTitle: { fontSize: 18, fontWeight: "700", color: "#fff" },
+  bannerTitle: { fontSize: 18, fontWeight: "700", color: "#fff", textAlign: "center" },
   videoListContainer: { paddingLeft: 20, paddingRight: 20 },
   videoItem: { width: VIDEO_WIDTH, marginRight: VIDEO_SPACING },
   videoContainer: {
@@ -778,14 +874,10 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     overflow: "hidden",
     backgroundColor: "#000",
-    position: "relative",
   },
-  videoThumbnail: { width: "100%", height: "100%" },
-  playButtonContainer: {
-    position: "absolute",
-    top: "50%",
-    left: "50%",
-    transform: [{ translateX: -24 }, { translateY: -24 }],
+  videoThumbnail: {
+    width: "100%",
+    height: "100%",
   },
   videoDurationBadge: {
     position: "absolute",
@@ -900,7 +992,7 @@ const styles = StyleSheet.create({
   durationBadge: { flexDirection: "row", alignItems: "center", gap: 4 },
   durationText: { fontSize: 13, color: "#666", fontWeight: "500" },
   bookButton: {
-    backgroundColor: "#6C3FE4",
+    backgroundColor: "#e68123",
     borderRadius: 10,
     paddingVertical: 14,
     alignItems: "center",
@@ -956,5 +1048,23 @@ const styles = StyleSheet.create({
     marginTop: 12,
     gap: 8,
   },
-  addAddressText: { fontSize: 16, fontWeight: "600", color: "#6C3FE4" },
+  addAddressText: { fontSize: 16, fontWeight: "600", color: "#e68123" },
+  fullVideo: {
+    width: "100%",
+    height: "100%",
+  },
+
+  fullVideoWrapper: {
+    width: "100%",
+    height: "60%",
+  },
+
+  fullVideoClose: {
+    position: "absolute",
+    top: 40,
+    right: 20,
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: "#00000088",
+  },
 });

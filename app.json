@@ -4,7 +4,7 @@
     "slug": "vint",
     "extra": {
       "webClientId": "1051125804819-jgiuubo27g6rrr4ph8vd32f2fujn3i10.apps.googleusercontent.com",
-      "androidClientId":"1051125804819-5m993sk85bdcep4vrppenficu868f72s.apps.googleusercontent.com",
+      "androidClientId": "1051125804819-5m993sk85bdcep4vrppenficu868f72s.apps.googleusercontent.com",
       "router": {},
       "eas": {
         "projectId": "3dcb5aac-bdcc-4412-91ec-b137232f888e"
@@ -12,7 +12,7 @@
     },
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/vint.png",
     "scheme": "frontend",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -22,18 +22,23 @@
     "android": {
       "package": "app.vint.app",
       "googleServicesFile": "./google-services.json",
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyCYL35Zswr8Nlt8cve7TKDhPcr1yNMoDCo"
+        }
+      },
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+        "foregroundImage": "./assets/images/vint.png",
+        "backgroundImage": "./assets/images/vint.png",
+        "monochromeImage": "./assets/images/vint.png"
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
     },
     "web": {
       "output": "static",
-      "favicon": "./assets/images/favicon.png",
+      "favicon": "./assets/images/vint.png",
       "config": {
         "firebase": {
           "apiKey": "AIzaSyCpXewQpdfU7XW2rieHhK7kbc-rTcMLQXs",
@@ -56,7 +61,7 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/splash-image.png",
+          "image": "./assets/images/vint.png",
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#ffffff",

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -7,636 +7,328 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
-  Modal,
-  TextInput,
   ActivityIndicator,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
+  Modal,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useAuth } from "../../../contexts/AuthContext";
 import firestore from "@react-native-firebase/firestore";
+import * as Location from "expo-location";
+import MapView, { Marker, PROVIDER_GOOGLE } from "react-native-maps";
+import Geocoder from "react-native-geocoding";
 
-type Address = {
-  id: string;
-  userId: string;
-  label: string;
-  name: string;
-  phone: string;
-  street: string;
-  city: string;
-  state: string;
-  pincode: string;
-  isDefault: boolean;
-  createdAt: any;
-};
+Geocoder.init("AIzaSyCYL35Zswr8Nlt8cve7TKDhPcr1yNMoDCo", { language: "en" });
 
 export default function AddressesScreen() {
-  const { user } = useAuth();
+  const { user } = useAuth(); // Assuming your context might have a setSelectedAddress
   const router = useRouter();
-
-  const [addresses, setAddresses] = useState<Address[]>([]);
+  const MAPS_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
+  const [viewMode, setViewMode] = useState<"list" | "form">("list");
+  const [savedAddresses, setSavedAddresses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [editingAddress, setEditingAddress] = useState<Address | null>(null);
+
+  // Form State
   const [saving, setSaving] = useState(false);
+  const [mainAddress, setMainAddress] = useState("");
+  const [addressDetails, setAddressDetails] = useState("");
+  const [receiverName, setReceiverName] = useState("");
+  const [receiverPhone, setReceiverPhone] = useState("");
+  const [addressLabel, setAddressLabel] = useState("Home");
 
-  const [formData, setFormData] = useState({
-    label: "Home",
-    name: "",
-    phone: "",
-    street: "",
-    city: "",
-    state: "",
-    pincode: "",
-    isDefault: false,
-  });
+  // Modal State
+  const [showReceiverModal, setShowReceiverModal] = useState(false);
+  const [tempName, setTempName] = useState("");
+  const [tempPhone, setTempPhone] = useState("");
 
+  // Map State
+  const [selectedCoords, setSelectedCoords] = useState({ latitude: 13.0827, longitude: 80.2707 });
+  const mapRef = useRef<MapView>(null);
+
+  // 1. Fetch User Profile for Defaults
   useEffect(() => {
-    if (!user?.uid) {
-      setAddresses([]);
-      setLoading(false);
-      return;
-    }
-
-    const q = firestore()
-      .collection("addresses")
-      .where("userId", "==", user.uid);
-
-    const unsubscribe = q.onSnapshot(
-      snapshot => {
-        const list: Address[] = snapshot.docs.map(d => ({
-          id: d.id,
-          ...(d.data() as any),
-        }));
-        setAddresses(list);
-        setLoading(false);
-      },
-      error => {
-        console.log("Addresses onSnapshot error", error);
-        Alert.alert("Error", "Failed to load addresses");
-        setLoading(false);
+    const fetchUserData = async () => {
+      if (!user?.uid) return;
+      try {
+        const userDoc = await firestore().collection("customers").doc(user.uid).get();
+        if (userDoc.exists) {
+          const data = userDoc.data();
+          const name = data?.name || data?.Name || "";
+          const phone = data?.phone || data?.phoneNumber || "";
+          setReceiverName(name);
+          setReceiverPhone(phone);
+          setTempName(name);
+          setTempPhone(phone);
+        }
+      } catch (error) {
+        console.error("Error fetching profile:", error);
       }
-    );
-
-    return unsubscribe;
+    };
+    fetchUserData();
   }, [user?.uid]);
 
-  const resetForm = () => {
-    setFormData({
-      label: "Home",
-      name: "",
-      phone: "",
-      street: "",
-      city: "",
-      state: "",
-      pincode: "",
-      isDefault: false,
-    });
-    setEditingAddress(null);
+  // 2. Real-time Addresses Listener
+  useEffect(() => {
+    if (!user?.uid) return;
+    const unsubscribe = firestore()
+      .collection("addresses")
+      .where("userId", "==", user.uid)
+      .orderBy("createdAt", "desc")
+      .onSnapshot((querySnapshot) => {
+        const addresses = querySnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+        setSavedAddresses(addresses);
+        setLoading(false);
+      }, (err) => setLoading(false));
+    return () => unsubscribe();
+  }, [user?.uid]);
+
+  // --- Actions ---
+
+  const handleSelectAddress = (address: any) => {
+    // 1. Optional: Update global state if your context supports it
+    // setSelectedAddress(address); 
+
+    // 2. Navigate back to Checkout/Cart with the selected data
+    router.back();
   };
 
-  const handleAddNew = () => {
-    resetForm();
-    setShowAddModal(true);
+  const handleCurrentLocation = async () => {
+    setViewMode("form");
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== "granted") return;
+      const pos = await Location.getCurrentPositionAsync({});
+      const newCoords = { latitude: pos.coords.latitude, longitude: pos.coords.longitude };
+      setSelectedCoords(newCoords);
+      const geoRes = await Geocoder.from(newCoords.latitude, newCoords.longitude);
+      if (geoRes.results.length > 0) setMainAddress(geoRes.results[0].formatted_address);
+    } catch (e) { console.log(e); }
   };
 
-  const handleEdit = (address: Address) => {
-    setEditingAddress(address);
-    setFormData({
-      label: address.label,
-      name: address.name,
-      phone: address.phone,
-      street: address.street,
-      city: address.city,
-      state: address.state,
-      pincode: address.pincode,
-      isDefault: address.isDefault,
-    });
-    setShowAddModal(true);
-  };
-
-  const validateForm = () => {
-    if (!formData.name.trim()) {
-      Alert.alert("Error", "Please enter name");
-      return false;
-    }
-    const phoneDigits = formData.phone.replace(/\D/g, "");
-    if (phoneDigits.length !== 10) {
-      Alert.alert("Error", "Please enter a valid 10-digit phone number");
-      return false;
-    }
-    if (!formData.street.trim()) {
-      Alert.alert("Error", "Please enter street address");
-      return false;
-    }
-    if (!formData.city.trim()) {
-      Alert.alert("Error", "Please enter city");
-      return false;
-    }
-    if (!formData.state.trim()) {
-      Alert.alert("Error", "Please enter state");
-      return false;
-    }
-    if (!formData.pincode.trim() || !/^\d{6}$/.test(formData.pincode)) {
-      Alert.alert("Error", "Please enter valid 6-digit pincode");
-      return false;
-    }
-    return true;
-  };
-
-  const handleSave = async () => {
-    if (!validateForm()) return;
-
-    if (!user) {
-      Alert.alert("Not logged in", "Please sign in to save an address.");
+  const saveAddress = async () => {
+    if (!mainAddress || !addressDetails) {
+      Alert.alert("Required", "Please provide address details.");
       return;
     }
-
     setSaving(true);
     try {
-      if (editingAddress) {
-        await firestore()
-          .collection("addresses")
-          .doc(editingAddress.id)
-          .update({
-            ...formData,
-            updatedAt: firestore.FieldValue.serverTimestamp(),
-          });
-        Alert.alert("Success", "Address updated successfully");
-      } else {
-        await firestore().collection("addresses").add({
-          ...formData,
-          userId: user.uid,
-          createdAt: firestore.FieldValue.serverTimestamp(),
-        });
-        Alert.alert("Success", "Address added successfully");
-      }
-      setShowAddModal(false);
-      resetForm();
-    } catch (error) {
-      console.error("Error saving address:", error);
-      Alert.alert("Error", "Failed to save address");
+      await firestore().collection("addresses").add({
+        userId: user?.uid,
+        label: addressLabel,
+        mainAddress,
+        addressDetails,
+        receiverName,
+        receiverPhone,
+        latitude: selectedCoords.latitude,
+        longitude: selectedCoords.longitude,
+        createdAt: firestore.FieldValue.serverTimestamp(),
+      });
+      setViewMode("list");
+      setAddressDetails("");
+    } catch (e) {
+      Alert.alert("Error", "Failed to save address.");
     } finally {
       setSaving(false);
     }
   };
 
-  const handleDelete = (address: Address) => {
-    Alert.alert(
-      "Delete Address",
-      `Are you sure you want to delete ${address.label}?`,
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              await firestore()
-                .collection("addresses")
-                .doc(address.id)
-                .delete();
-              Alert.alert("Success", "Address deleted");
-            } catch (error) {
-              Alert.alert("Error", "Failed to delete address");
-            }
-          },
-        },
-      ]
-    );
+  const deleteAddress = (id: string) => {
+    Alert.alert("Delete", "Remove this address?", [
+      { text: "Cancel" },
+      { text: "Delete", style: "destructive", onPress: () => firestore().collection("addresses").doc(id).delete() }
+    ]);
   };
 
-  const handleSetDefault = async (address: Address) => {
-    try {
-      const batch = firestore().batch();
+  // --- UI Views ---
 
-      addresses.forEach(addr => {
-        const ref = firestore().collection("addresses").doc(addr.id);
-        if (addr.id === address.id) {
-          batch.update(ref, { isDefault: true });
-        } else if (addr.isDefault) {
-          batch.update(ref, { isDefault: false });
-        }
-      });
-
-      await batch.commit();
-      Alert.alert("Success", "Default address updated");
-    } catch (error) {
-      Alert.alert("Error", "Failed to set default address");
-    }
-  };
-
-  if (loading) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#007AFF" />
-          <Text style={styles.loadingText}>Loading addresses...</Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
-  return (
-    <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color="#333" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Manage Addresses</Text>
-        <View style={{ width: 40 }} />
+  const ListView = () => (
+    <View style={styles.container}>
+      <View style={styles.headerSelection}>
+        <TouchableOpacity onPress={() => router.back()}><Ionicons name="chevron-down" size={28} color="#333" /></TouchableOpacity>
+        <Text style={styles.headerTitle}>Select a location</Text>
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {addresses.length === 0 ? (
-          <View style={styles.emptyState}>
-            <Ionicons name="location-outline" size={80} color="#e0e0e0" />
-            <Text style={styles.emptyText}>No addresses added yet</Text>
-            <Text style={styles.emptySubtext}>
-              Add your first address to get started
-            </Text>
-          </View>
-        ) : (
-          addresses.map(address => (
-            <View key={address.id} style={styles.addressCard}>
-              <View style={styles.addressHeader}>
-                <View style={styles.addressLabelContainer}>
-                  <Ionicons
-                    name={
-                      address.label === "Home"
-                        ? "home"
-                        : address.label === "Work"
-                        ? "business"
-                        : "location"
-                    }
-                    size={20}
-                    color="#007AFF"
-                  />
-                  <Text style={styles.addressLabel}>{address.label}</Text>
-                  {address.isDefault && (
-                    <View style={styles.defaultBadge}>
-                      <Text style={styles.defaultText}>Default</Text>
-                    </View>
-                  )}
-                </View>
-                <View style={styles.addressActions}>
-                  <TouchableOpacity
-                    onPress={() => handleEdit(address)}
-                    style={styles.actionButton}
-                  >
-                    <Ionicons name="pencil" size={18} color="#007AFF" />
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    onPress={() => handleDelete(address)}
-                    style={styles.actionButton}
-                  >
-                    <Ionicons name="trash-outline" size={18} color="#FF3B30" />
-                  </TouchableOpacity>
-                </View>
-              </View>
+      <View style={styles.searchBoxSelection}>
+        <Ionicons name="search" size={20} color="#10B981" />
+        <TextInput placeholder="Search for area, street name..." style={styles.searchInput} />
+      </View>
 
-              <View style={styles.addressDetails}>
-                <Text style={styles.addressName}>{address.name}</Text>
-                <Text style={styles.addressPhone}>{address.phone}</Text>
-                <Text style={styles.addressText}>
-                  {address.street}, {address.city}
-                </Text>
-                <Text style={styles.addressText}>
-                  {address.state} - {address.pincode}
-                </Text>
-              </View>
-
-              {!address.isDefault && (
-                <TouchableOpacity
-                  style={styles.setDefaultButton}
-                  onPress={() => handleSetDefault(address)}
-                >
-                  <Text style={styles.setDefaultText}>Set as Default</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          ))
-        )}
-      </ScrollView>
-
-      {/* Add Button */}
-      <TouchableOpacity style={styles.addButton} onPress={handleAddNew}>
-        <Ionicons name="add" size={24} color="#fff" />
-        <Text style={styles.addButtonText}>Add New Address</Text>
-      </TouchableOpacity>
-
-      {/* Add/Edit Modal */}
-      <Modal visible={showAddModal} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>
-                {editingAddress ? "Edit Address" : "Add New Address"}
-              </Text>
-              <TouchableOpacity onPress={() => setShowAddModal(false)}>
-                <Ionicons name="close" size={24} color="#333" />
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView showsVerticalScrollIndicator={false}>
-              {/* Address Type */}
-              <View style={styles.labelSelector}>
-                {["Home", "Work", "Other"].map(label => (
-                  <TouchableOpacity
-                    key={label}
-                    style={[
-                      styles.labelButton,
-                      formData.label === label && styles.labelButtonActive,
-                    ]}
-                    onPress={() => setFormData({ ...formData, label })}
-                  >
-                    <Text
-                      style={[
-                        styles.labelButtonText,
-                        formData.label === label && styles.labelButtonTextActive,
-                      ]}
-                    >
-                      {label}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-
-              {/* Form Fields */}
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Full Name *</Text>
-                <TextInput
-                  style={styles.input}
-                  value={formData.name}
-                  onChangeText={text =>
-                    setFormData({ ...formData, name: text })
-                  }
-                  placeholder="Enter full name"
-                  placeholderTextColor="#999"
-                />
-              </View>
-
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Phone Number *</Text>
-                <TextInput
-                  style={styles.input}
-                  value={formData.phone}
-                  onChangeText={text =>
-                    setFormData({ ...formData, phone: text })
-                  }
-                  placeholder="Enter 10-digit phone number"
-                  placeholderTextColor="#999"
-                  keyboardType="phone-pad"
-                  maxLength={10}
-                />
-              </View>
-
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Street Address *</Text>
-                <TextInput
-                  style={[styles.input, styles.textArea]}
-                  value={formData.street}
-                  onChangeText={text =>
-                    setFormData({ ...formData, street: text })
-                  }
-                  placeholder="House/Flat no., Building name, Street"
-                  placeholderTextColor="#999"
-                  multiline
-                  numberOfLines={3}
-                />
-              </View>
-
-              <View style={styles.row}>
-                <View style={[styles.inputGroup, styles.halfWidth]}>
-                  <Text style={styles.inputLabel}>City *</Text>
-                  <TextInput
-                    style={styles.input}
-                    value={formData.city}
-                    onChangeText={text =>
-                      setFormData({ ...formData, city: text })
-                    }
-                    placeholder="City"
-                    placeholderTextColor="#999"
-                  />
-                </View>
-
-                <View style={[styles.inputGroup, styles.halfWidth]}>
-                  <Text style={styles.inputLabel}>Pincode *</Text>
-                  <TextInput
-                    style={styles.input}
-                    value={formData.pincode}
-                    onChangeText={text =>
-                      setFormData({ ...formData, pincode: text })
-                    }
-                    placeholder="6-digit pincode"
-                    placeholderTextColor="#999"
-                    keyboardType="number-pad"
-                    maxLength={6}
-                  />
-                </View>
-              </View>
-
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>State *</Text>
-                <TextInput
-                  style={styles.input}
-                  value={formData.state}
-                  onChangeText={text =>
-                    setFormData({ ...formData, state: text })
-                  }
-                  placeholder="State"
-                  placeholderTextColor="#999"
-                />
-              </View>
-
-              <TouchableOpacity
-                style={styles.defaultCheckbox}
-                onPress={() =>
-                  setFormData({
-                    ...formData,
-                    isDefault: !formData.isDefault,
-                  })
-                }
-              >
-                <Ionicons
-                  name={formData.isDefault ? "checkbox" : "square-outline"}
-                  size={24}
-                  color="#007AFF"
-                />
-                <Text style={styles.defaultCheckboxText}>
-                  Set as default address
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.saveButton, saving && styles.saveButtonDisabled]}
-                onPress={handleSave}
-                disabled={saving}
-              >
-                {saving ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <Text style={styles.saveButtonText}>
-                    {editingAddress ? "Update Address" : "Save Address"}
-                  </Text>
-                )}
-              </TouchableOpacity>
-            </ScrollView>
+      <TouchableOpacity style={styles.actionRow} onPress={handleCurrentLocation}>
+        <View style={styles.actionRowLeft}>
+          <Ionicons name="locate-outline" size={22} color="#10B981" />
+          <View style={styles.actionTextContainer}>
+            <Text style={styles.actionTextMain}>Use current location</Text>
+            <Text style={styles.actionTextSub}>Mannurpet, Padi, Chennai</Text>
           </View>
         </View>
-      </Modal>
+        <Ionicons name="chevron-forward" size={20} color="#ccc" />
+      </TouchableOpacity>
+
+      <TouchableOpacity style={styles.actionRow} onPress={() => setViewMode("form")}>
+        <View style={styles.actionRowLeft}>
+          <Ionicons name="add" size={24} color="#10B981" />
+          <Text style={styles.actionTextMain}>  Add Address</Text>
+        </View>
+        <Ionicons name="chevron-forward" size={20} color="#ccc" />
+      </TouchableOpacity>
+
+      <View style={styles.sectionHeader}><Text style={styles.sectionHeaderText}>SAVED ADDRESSES</Text></View>
+
+      <ScrollView style={{ flex: 1 }}>
+        {loading ? <ActivityIndicator style={{ marginTop: 20 }} color="#10B981" /> : savedAddresses.map((item) => (
+          <TouchableOpacity
+            key={item.id}
+            style={styles.addressCard}
+            onPress={() => handleSelectAddress(item)} // Clicking selects the address
+          >
+            <View style={styles.addressCardMain}>
+              <Ionicons name="location-outline" size={24} color="#666" />
+              <View style={styles.addressCardContent}>
+                <Text style={styles.addressCardTitle}>{item.label}</Text>
+                <Text style={styles.addressCardSub}>{item.addressDetails}, {item.mainAddress}</Text>
+                <Text style={styles.addressCardPhone}>Phone number: {item.receiverPhone}</Text>
+              </View>
+            </View>
+            <TouchableOpacity
+              onPress={() => deleteAddress(item.id)}
+              style={styles.deleteBtn}
+            >
+              <Ionicons name="trash-outline" size={18} color="#EF4444" />
+              <Text style={{ color: '#EF4444', fontSize: 12, marginLeft: 5 }}>Delete</Text>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+    </View>
+  );
+
+  const FormView = () => (
+    <SafeAreaView style={styles.container}>
+      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1 }}>
+        <View style={styles.headerRow}>
+          <TouchableOpacity onPress={() => setViewMode("list")}><Ionicons name="arrow-back" size={24} color="#333" /></TouchableOpacity>
+          <View style={styles.searchBox}>
+            <Ionicons name="search" size={20} color="#10B981" />
+            <TextInput placeholder="Confirm delivery location" style={styles.searchInput} value={mainAddress} onChangeText={setMainAddress} />
+          </View>
+        </View>
+
+        <ScrollView showsVerticalScrollIndicator={false}>
+          <View style={styles.mapFrame}>
+            <MapView ref={mapRef} style={styles.map} region={{ ...selectedCoords, latitudeDelta: 0.005, longitudeDelta: 0.005 }} provider={PROVIDER_GOOGLE}>
+              <Marker coordinate={selectedCoords}><Ionicons name="location" size={40} color="#10B981" /></Marker>
+            </MapView>
+          </View>
+
+          <View style={styles.formContent}>
+            <View style={styles.addressDisplay}>
+              <Ionicons name="location" size={24} color="#10B981" />
+              <Text style={styles.mainAddrText} numberOfLines={1}>{mainAddress || "Loading location..."}</Text>
+            </View>
+
+            <TextInput style={styles.detailsInput} placeholder="Address details (Flat, House No)*" value={addressDetails} onChangeText={setAddressDetails} />
+
+            <Text style={styles.sectionLabel}>Receiver details for this address</Text>
+            <TouchableOpacity style={styles.receiverCard} onPress={() => setShowReceiverModal(true)}>
+              <Ionicons name="call-outline" size={20} color="#333" />
+              <View style={{ flex: 1, marginLeft: 10 }}>
+                <Text style={styles.receiverMainText}>{receiverName}, <Text style={{ fontWeight: '700' }}>{receiverPhone}</Text></Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color="#999" />
+            </TouchableOpacity>
+
+            <Text style={styles.sectionLabel}>Save address as</Text>
+            <View style={styles.chipRow}>
+              {['Home', 'Work', 'Other'].map((l) => (
+                <TouchableOpacity key={l} style={[styles.chip, addressLabel === l && styles.chipActive]} onPress={() => setAddressLabel(l)}>
+                  <Text style={[styles.chipText, addressLabel === l && styles.chipTextActive]}>{l}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        </ScrollView>
+
+        <View style={styles.footer}>
+          <TouchableOpacity style={styles.saveBtn} onPress={saveAddress} disabled={saving}>
+            {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveBtnText}>Save address</Text>}
+          </TouchableOpacity>
+        </View>
+
+        {/* Modal for editing Receiver Details */}
+        <Modal visible={showReceiverModal} transparent animationType="slide">
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <Text style={styles.modalTitle}>Update Receiver</Text>
+              <TextInput style={styles.modalInput} placeholder="Full Name" value={tempName} onChangeText={setTempName} />
+              <TextInput style={styles.modalInput} placeholder="Phone Number" value={tempPhone} keyboardType="phone-pad" onChangeText={setTempPhone} />
+              <View style={styles.modalButtons}>
+                <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowReceiverModal(false)}><Text>Cancel</Text></TouchableOpacity>
+                <TouchableOpacity style={styles.confirmBtn} onPress={() => {
+                  setReceiverName(tempName);
+                  setReceiverPhone(tempPhone);
+                  setShowReceiverModal(false);
+                }}><Text style={{ color: '#fff', fontWeight: '700' }}>Update</Text></TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
+
+  return viewMode === "list" ? <ListView /> : <FormView />;
 }
 
-
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#f8f9fa" },
-  loadingContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
-  loadingText: { marginTop: 16, fontSize: 16, color: "#666" },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 20,
-    paddingVertical: 40,
-    backgroundColor: "#fff",
-    borderBottomWidth: 1,
-    borderBottomColor: "#f0f0f0",
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "#f8f9fa",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  headerTitle: { fontSize: 18, fontWeight: "700", color: "#333" },
-  content: { flex: 1, padding: 20 },
-  emptyState: { alignItems: "center", justifyContent: "center", paddingVertical: 80 },
-  emptyText: { fontSize: 18, fontWeight: "600", color: "#333", marginTop: 16 },
-  emptySubtext: { fontSize: 14, color: "#666", marginTop: 8 },
-  addressCard: {
-    backgroundColor: "#fff",
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  addressHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 12,
-  },
-  addressLabelContainer: { flexDirection: "row", alignItems: "center", gap: 8 },
-  addressLabel: { fontSize: 16, fontWeight: "700", color: "#333" },
-  defaultBadge: {
-    backgroundColor: "#007AFF20",
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
-  },
-  defaultText: { fontSize: 11, fontWeight: "600", color: "#007AFF" },
-  addressActions: { flexDirection: "row", gap: 12 },
-  actionButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: "#f8f9fa",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  addressDetails: { marginBottom: 12 },
-  addressName: { fontSize: 16, fontWeight: "600", color: "#333", marginBottom: 4 },
-  addressPhone: { fontSize: 14, color: "#666", marginBottom: 8 },
-  addressText: { fontSize: 14, color: "#666", lineHeight: 20 },
-  setDefaultButton: {
-    paddingVertical: 10,
-    borderTopWidth: 1,
-    borderTopColor: "#f0f0f0",
-    marginTop: 8,
-    alignItems: "center",
-  },
-  setDefaultText: { fontSize: 14, fontWeight: "600", color: "#007AFF" },
-  addButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#007AFF",
-    marginHorizontal: 20,
-    marginBottom: 20,
-    paddingVertical: 16,
-    borderRadius: 12,
-    gap: 8,
-  },
-  addButtonText: { fontSize: 16, fontWeight: "700", color: "#fff" },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-    justifyContent: "flex-end",
-  },
-  modalContent: {
-    backgroundColor: "#fff",
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    paddingTop: 20,
-    paddingBottom: 40,
-    paddingHorizontal: 20,
-    maxHeight: "90%",
-  },
-  modalHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 20,
-  },
-  modalTitle: { fontSize: 20, fontWeight: "700", color: "#333" },
-  labelSelector: { flexDirection: "row", gap: 12, marginBottom: 20 },
-  labelButton: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#e0e0e0",
-    alignItems: "center",
-  },
-  labelButtonActive: { backgroundColor: "#007AFF", borderColor: "#007AFF" },
-  labelButtonText: { fontSize: 14, fontWeight: "600", color: "#666" },
-  labelButtonTextActive: { color: "#fff" },
-  inputGroup: { marginBottom: 16 },
-  inputLabel: { fontSize: 14, fontWeight: "600", color: "#333", marginBottom: 8 },
-  input: {
-    borderWidth: 1,
-    borderColor: "#e0e0e0",
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 15,
-    color: "#333",
-  },
-  textArea: { height: 80, textAlignVertical: "top" },
-  row: { flexDirection: "row", gap: 12 },
-  halfWidth: { flex: 1 },
-  defaultCheckbox: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    marginBottom: 20,
-  },
-  defaultCheckboxText: { fontSize: 15, color: "#333" },
-  saveButton: {
-    backgroundColor: "#007AFF",
-    paddingVertical: 16,
-    borderRadius: 12,
-    alignItems: "center",
-    marginTop: 8,
-  },
-  saveButtonDisabled: { opacity: 0.6 },
-  saveButtonText: { fontSize: 16, fontWeight: "700", color: "#fff" },
+  container: { flex: 1, backgroundColor: "#fff" },
+  headerSelection: { flexDirection: 'row', alignItems: 'center', padding: 15, gap: 10 },
+  headerTitle: { fontSize: 18, fontWeight: '700' },
+  searchBoxSelection: { marginHorizontal: 15, marginBottom: 15, flexDirection: 'row', alignItems: 'center', backgroundColor: '#F3F4F6', borderRadius: 10, paddingHorizontal: 10, height: 45 },
+  actionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 18, borderBottomWidth: 1, borderBottomColor: '#f0f0f0' },
+  actionRowLeft: { flexDirection: 'row', alignItems: 'center', flex: 1 },
+  actionTextContainer: { marginLeft: 15 },
+  actionTextMain: { fontSize: 16, fontWeight: '600', color: '#10B981' },
+  actionTextSub: { fontSize: 13, color: '#999', marginTop: 2 },
+  sectionHeader: { backgroundColor: '#F9FAFB', padding: 12, paddingLeft: 15 },
+  sectionHeaderText: { fontSize: 12, fontWeight: '700', color: '#6B7280' },
+  addressCard: { padding: 15, borderBottomWidth: 1, borderBottomColor: '#f0f0f0' },
+  addressCardMain: { flexDirection: 'row' },
+  addressCardContent: { flex: 1, marginLeft: 15 },
+  addressCardTitle: { fontSize: 15, fontWeight: '700' },
+  addressCardSub: { fontSize: 13, color: '#666', marginTop: 4 },
+  addressCardPhone: { fontSize: 13, color: '#333', marginTop: 4 },
+  deleteBtn: { flexDirection: 'row', alignItems: 'center', marginTop: 10, marginLeft: 40 },
+
+  headerRow: { flexDirection: 'row', alignItems: 'center', padding: 15, gap: 10 },
+  searchBox: { flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: '#F3F4F6', borderRadius: 10, paddingHorizontal: 10, height: 45 },
+  searchInput: { flex: 1, marginLeft: 8, fontSize: 14 },
+  mapFrame: { height: 260, width: '100%' },
+  map: { flex: 1 },
+  formContent: { padding: 20 },
+  addressDisplay: { flexDirection: 'row', alignItems: 'center', paddingVertical: 15, borderBottomWidth: 1, borderBottomColor: '#f0f0f0' },
+  mainAddrText: { flex: 1, marginLeft: 10, fontSize: 16, fontWeight: '600' },
+  detailsInput: { fontSize: 16, paddingVertical: 15, borderBottomWidth: 1, borderBottomColor: '#f0f0f0', marginTop: 10 },
+  sectionLabel: { fontSize: 14, color: '#666', marginTop: 25, marginBottom: 10 },
+  receiverCard: { flexDirection: 'row', alignItems: 'center', padding: 15, backgroundColor: '#F9FAFB', borderRadius: 10, borderWidth: 1, borderColor: '#eee' },
+  receiverMainText: { fontSize: 15, color: '#333' },
+  chipRow: { flexDirection: 'row', gap: 10 },
+  chip: { paddingHorizontal: 20, paddingVertical: 8, borderRadius: 8, borderWidth: 1, borderColor: '#eee' },
+  chipActive: { borderColor: '#10B981', backgroundColor: '#ECFDF5' },
+  chipText: { color: '#666' },
+  chipTextActive: { color: '#10B981', fontWeight: '600' },
+  footer: { padding: 20, borderTopWidth: 1, borderTopColor: '#f0f0f0' },
+  saveBtn: { backgroundColor: '#059669', paddingVertical: 15, borderRadius: 10, alignItems: 'center' },
+  saveBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+
+  // Modal Styles
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 20 },
+  modalContent: { backgroundColor: '#fff', borderRadius: 15, padding: 20 },
+  modalTitle: { fontSize: 18, fontWeight: '700', marginBottom: 15 },
+  modalInput: { borderWidth: 1, borderColor: '#eee', borderRadius: 8, padding: 12, marginBottom: 10 },
+  modalButtons: { flexDirection: 'row', justifyContent: 'flex-end', gap: 10, marginTop: 10 },
+  cancelBtn: { padding: 10 },
+  confirmBtn: { backgroundColor: '#10B981', padding: 10, borderRadius: 8, paddingHorizontal: 20 },
 });
